@@ -1,0 +1,107 @@
+<div class="contact-page container">
+  <header class="contact-header">
+    <h1>Contact Us</h1>
+    <div class="text-container">
+      <p>Have questions or need a custom quote? We're here to help you with all your cleaning needs.</p>
+    </div>
+  </header>
+
+  <div class="contact-grid">
+    <div class="contact-info">
+      <div class="info-card">
+        <h3>Our Office</h3>
+        <p>Tampa, FL, United States</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Call Us</h3>
+        <p><a href="tel:+18132911308">+1 813-291-1308</a></p>
+        <p>Mon-Fri: 8am - 6pm</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Email Us</h3>
+        <p><a href="mailto:zcleanup25@gmail.com">zcleanup25@gmail.com</a></p>
+      </div>
+
+      <div class="social-info">
+        <h3>Follow Us</h3>
+        <div class="social-links">
+          <a href="https://www.facebook.com/people/ZCleanUp-LLC/61581004726667/?mibextid=wwXIfr&rdid=s4BddP5opJKQMXIT&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F16NiBeFsnw%2F%3Fmibextid%3DwwXIfr" target="_blank" rel="noopener noreferrer" class="social-link facebook">
+            <img src="assets/images/icons/facebook.png" alt="Facebook"> Facebook
+          </a>
+          <a href="https://www.instagram.com/zcleanupllc/" target="_blank" rel="noopener noreferrer" class="social-link instagram">
+            <img src="assets/images/icons/instagram.png" alt="Instagram"> Instagram
+          </a>
+        </div>
+      </div>
+
+      <div class="map-container">
+        <google-map 
+          height="300px" 
+          width="100%" 
+          [center]="mapCenter" 
+          [options]="mapOptions">
+          <map-marker 
+             *ngFor="let marker of markers" 
+             [position]="marker.position" 
+             [title]="marker.title" 
+             [label]="marker.label"
+             [options]="marker.options">
+           </map-marker>
+           <map-circle
+             *ngFor="let circle of circles"
+             [center]="circle.center"
+             [radius]="circle.radius"
+             [options]="circle.options">
+           </map-circle>
+         </google-map>
+      </div>
+    </div>
+
+    <div class="contact-form-container">
+      <div *ngIf="submitSuccess" class="alert alert-success">
+        <p>{{ submitMessage }}</p>
+        <app-button (btnClick)="submitSuccess = false" variant="outline" size="small">Send Another Message</app-button>
+      </div>
+
+      <form *ngIf="!submitSuccess" [formGroup]="contactForm" (ngSubmit)="onSubmit()" class="contact-form">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" formControlName="name" placeholder="John Doe" maxlength="60" autocomplete="name" [class.invalid]="isFieldInvalid('name')">
+          <div *ngIf="isFieldInvalid('name')" class="error-msg">Name is required (min 3 chars).</div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')">
+          <div *ngIf="isFieldInvalid('email')" class="error-msg">A valid email is required.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="subject">Subject</label>
+          <select id="subject" formControlName="subject" [class.invalid]="isFieldInvalid('subject')">
+            <option value="" disabled selected>Select a subject</option>
+            <option value="General Inquiry">General Inquiry</option>
+            <option value="Custom Quote">Custom Quote</option>
+            <option value="Feedback">Feedback</option>
+            <option value="Support">Support</option>
+          </select>
+          <div *ngIf="isFieldInvalid('subject')" class="error-msg">Please select a subject.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" formControlName="message" rows="5" maxlength="1500" placeholder="How can we help you?" [class.invalid]="isFieldInvalid('message')"></textarea>
+          <div *ngIf="isFieldInvalid('message')" class="error-msg">Message is required (min 20 chars).</div>
+        </div>
+
+        <div class="form-actions">
+          <app-button type="submit" size="large" [loading]="isSubmitting" [disabled]="contactForm.invalid">
+            Send Message
+          </app-button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

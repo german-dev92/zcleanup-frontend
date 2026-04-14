@@ -1,0 +1,90 @@
+<div class="about-page container">
+  <header class="about-header">
+    <h1>About ZCleanUp</h1>
+    <div class="text-container">
+      <p>We are a team of dedicated professionals committed to making your space shine.</p>
+    </div>
+  </header>
+
+  <section class="mission">
+    <div class="mission-content">
+      <div class="mission-text text-content">
+        <h2>Our Mission</h2>
+        <p>At ZCleanUp, our mission is to provide high-quality cleaning services that improve the lives of our clients. We believe that a clean environment leads to a happier, healthier, and more productive life.</p>
+        <p>Since our founding in 2020, we have grown from a small local team to a full-service cleaning company serving the entire metropolitan area.</p>
+      </div>
+      <div class="mission-logo">
+        <img src="assets/images/logos/ZcleanUP.png" alt="ZCleanUp Logo" class="about-logo">
+      </div>
+    </div>
+  </section>
+
+  <section class="values">
+    <h2 class="section-title">Our Core Values</h2>
+    <p class="section-subtitle">The way we show up—every visit, every home, every time.</p>
+    <div class="values-grid">
+      <div class="value-card" *ngFor="let value of values; let i = index">
+        <div class="value-icon" aria-hidden="true" [ngSwitch]="i">
+          <i *ngSwitchCase="0" class="fas fa-clock"></i>
+          <i *ngSwitchCase="1" class="fas fa-certificate"></i>
+          <i *ngSwitchCase="2" class="fas fa-handshake"></i>
+        </div>
+        <h3>{{ value.title }}</h3>
+        <p class="value-tagline" [ngSwitch]="value.title">
+          <ng-container *ngSwitchCase="'Reliability'">You can count on us—no surprises, just a clean you’ll feel.</ng-container>
+          <ng-container *ngSwitchCase="'Quality'">We don’t rush. We finish with pride.</ng-container>
+          <ng-container *ngSwitchCase="'Trust'">We treat your home with the respect we’d want for our own.</ng-container>
+        </p>
+        <p class="value-description">{{ value.description }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="why-choose">
+    <h2 class="section-title">Why Choose ZCleanUp</h2>
+    <div class="feature-grid">
+      <div class="feature-card" *ngFor="let item of whyChooseUs; let i = index">
+        <div class="feature-icon" aria-hidden="true" [ngSwitch]="i">
+          <i *ngSwitchCase="0" class="fas fa-shield-alt"></i>
+          <i *ngSwitchCase="1" class="fas fa-check-circle"></i>
+          <i *ngSwitchCase="2" class="fas fa-search"></i>
+          <i *ngSwitchCase="3" class="fas fa-calendar-alt"></i>
+          <i *ngSwitchCase="4" class="fas fa-star"></i>
+        </div>
+        <h3>{{ item.title }}</h3>
+        <p>{{ item.description }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="process">
+    <h2 class="section-title">Our Cleaning Process</h2>
+    <div class="process-grid">
+      <div class="process-step" *ngFor="let step of cleaningProcess">
+        <div class="step-number">{{ step.step }}</div>
+        <div class="step-content">
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="service-area">
+    <div class="service-area-card">
+      <h2>Proudly Serving Your Area</h2>
+      <p>We proudly provide cleaning services in Tampa and surrounding areas including Odessa, Wesley Chapel, New Port Richey, Clearwater, and Saint Petersburg.</p>
+    </div>
+  </section>
+
+  <section class="cta-banner">
+    <div class="container">
+      <div class="about-cta">
+        <div class="cta-content">
+          <h2>Ready to join our family of satisfied clients?</h2>
+          <app-button routerLink="/book-service" variant="accent" size="large">Book Your Cleaning Now</app-button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

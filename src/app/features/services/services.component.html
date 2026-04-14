@@ -1,0 +1,116 @@
+<div class="services-page container">
+  <header class="services-header">
+    <h1>Our Cleaning Services</h1>
+    <div class="text-container">
+      <p>Professional cleaning solutions for every need. Explore our range of services designed to keep your space spotless.</p>
+    </div>
+  </header>
+
+  <div class="services-grid">
+    <ng-container *ngFor="let service of services">
+      <div class="service-card text-content" *ngIf="service.enabled">
+        <img [src]="service.icon" [alt]="service.title + ' Icon'" class="service-icon">
+        <div class="service-content">
+          <h3>{{ service.title }}</h3>
+          <p>{{ service.description }}</p>
+          <div class="service-actions">
+            <app-button (btnClick)="openServiceModal(service)" variant="outline" size="small">Quick View</app-button>
+            <app-button (btnClick)="goToDetail(service)" variant="primary" size="small">Full Details</app-button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Future service (disabled for now) 
+    <div class="service-card">
+      <img src="assets/images/icons/Office_Cleaning.png" alt="Office Cleaning Icon" class="service-icon">
+      <div class="service-content">
+        <h3>Office Cleaning</h3>
+        <p>Professional cleaning services for offices and corporate spaces.</p>
+        <app-button [disabled]="true" variant="outline" size="small">Coming Soon</app-button>
+      </div>
+    </div>
+    -->
+  </div>
+
+  <!-- Service Modal -->
+  <div class="service-modal" *ngIf="selectedService" [class.show]="selectedService">
+    <div class="modal-overlay" (click)="closeModal()"></div>
+    <div class="modal-content">
+      <button class="modal-close" (click)="closeModal()" aria-label="Close modal">&times;</button>
+      
+      <div class="modal-header">
+        <img [src]="selectedService.icon" [alt]="selectedService.title" class="modal-icon">
+        <div class="header-text text-content">
+          <h2>{{ selectedService.title }}</h2>
+          <p class="short-desc">{{ selectedService.description }}</p>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="details-section text-content" *ngIf="selectedService.details">
+          <p class="full-details">{{ selectedService.details }}</p>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item pricing-item">
+            <span class="info-label">💰 Pricing</span>
+            <span class="info-value" *ngIf="selectedService.basePrice && !selectedService.priceNote">Starting at ${{ selectedService.basePrice }}</span>
+            <span class="info-value" *ngIf="selectedService.priceNote">{{ selectedService.priceNote }}</span>
+          </div>
+          <div class="info-item" *ngIf="selectedService.duration">
+            <span class="info-label">⏱ Duration</span>
+            <span class="info-value">{{ selectedService.duration }}</span>
+          </div>
+          <div class="info-item" *ngIf="selectedService.frequency">
+            <span class="info-label">📅 Recommended Frequency</span>
+            <span class="info-value">{{ selectedService.frequency }}</span>
+          </div>
+        </div>
+
+        <div class="lists-container">
+          <!-- Structured Sections -->
+          <ng-container *ngIf="selectedService.sections">
+            <div class="list-section included" *ngFor="let section of selectedService.sections">
+              <h4>{{ section.title }}</h4>
+              <ul>
+                <li *ngFor="let item of section.items">
+                  <span class="check">✓</span> {{ item }}
+                </li>
+              </ul>
+            </div>
+          </ng-container>
+
+          <!-- Fallback Included List -->
+          <div class="list-section included" *ngIf="!selectedService.sections && selectedService.included?.length">
+            <h4>What's Included</h4>
+            <ul>
+              <li *ngFor="let item of selectedService.included">
+                <span class="check">✓</span> {{ item }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="modal-actions">
+          <app-button (btnClick)="goToDetail(selectedService)" variant="outline" size="large">
+            Full Service Page
+          </app-button>
+          <app-button (btnClick)="bookService(selectedService)" [attr.data-service]="selectedService.title" size="large" variant="accent">
+            Book this Service
+          </app-button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="cta-banner">
+    <div class="cta-content">
+      <h2>Not sure which service you need?</h2>
+      <p>Contact our team for a personalized recommendation based on your specific requirements.</p>
+      <app-button routerLink="/contact" variant="accent">Contact Us Today</app-button>
+    </div>
+  </section>
+</div>

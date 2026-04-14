@@ -1,0 +1,8 @@
+<button 
+  [type]="type"
+  [disabled]="disabled || loading"
+  [class]="'btn btn-' + variant + ' btn-' + size"
+  (click)="onClick()">
+  <span *ngIf="loading" class="loader-icon"></span>
+  <ng-content></ng-content>
+</button>

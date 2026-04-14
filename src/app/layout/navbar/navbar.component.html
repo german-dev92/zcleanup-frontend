@@ -1,0 +1,23 @@
+<nav class="navbar">
+  <div class="container navbar-content">
+    <a routerLink="/" class="logo" (click)="closeMenu()">
+       <img src="assets/images/logos/ZcleanUP.png" alt="Company Logo">
+      <span class="logo-text">ZClean<span class="logo-highlight">Up</span></span>
+    </a>
+
+    <button class="mobile-toggle" (click)="toggleMenu()" [attr.aria-expanded]="isMenuOpen">
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+    </button>
+
+    <ul class="nav-links" [class.open]="isMenuOpen">
+      <li><a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" (click)="closeMenu()">Home</a></li>
+      <li><a routerLink="/about" routerLinkActive="active" (click)="closeMenu()">About</a></li>
+      <li><a routerLink="/services" routerLinkActive="active" (click)="closeMenu()">Services</a></li>
+      <li><a routerLink="/promotions" routerLinkActive="active" (click)="closeMenu()">Promotions</a></li>
+      <li><a routerLink="/contact" routerLinkActive="active" (click)="closeMenu()">Contact</a></li>
+      <li><a routerLink="/book-service" class="btn btn-accent" (click)="closeMenu()">Book Now</a></li>
+    </ul>
+  </div>
+</nav>

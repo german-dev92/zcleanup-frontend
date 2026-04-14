@@ -1,0 +1,32 @@
+<div class="promotions-page container">
+  <header class="promotions-header">
+    <h1>Promotions</h1>
+    <p>Current offers to help you save on your next cleaning service.</p>
+  </header>
+
+  <section class="promotions-list">
+    <div class="promotions-grid">
+      <div class="promotion-card text-content" *ngFor="let promo of promotions">
+        <div class="promo-top">
+          <span class="promo-badge" *ngIf="promo.label">{{ promo.label }}</span>
+          <span class="promo-discount">{{ promo.discountText }}</span>
+        </div>
+
+        <h3 class="promo-title">{{ promo.title }}</h3>
+        <p class="promo-description">{{ promo.description }}</p>
+
+        <div class="promo-actions">
+          <app-button
+            routerLink="/book-service"
+            [queryParams]="{ promo: promo.id, discount: 1 }"
+            fragment="booking-form"
+            variant="accent"
+            size="large"
+          >
+            Claim Offer
+          </app-button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

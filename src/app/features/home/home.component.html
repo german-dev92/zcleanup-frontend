@@ -1,0 +1,107 @@
+<div class="home">
+  <!-- Hero Section -->
+  <section class="hero">
+    <app-hero-slider [slides]="heroSlides" [autoCycle]="true" [intervalMs]="6000"></app-hero-slider>
+    <div class="hero-overlay">
+      <div class="container hero-content">
+        <div class="hero-text">
+          <h1>Professional Cleaning <br> For Your <span>Space</span></h1>
+          <div class="text-container">
+            <p>Expert cleaning services tailored to your needs. We bring the sparkle back to your home and office.</p>
+          </div>
+          <div class="hero-actions">
+            <app-button routerLink="/book-service" size="large" variant="accent">Book a Service</app-button>
+            <app-button routerLink="/services" size="large" variant="outline">Our Services</app-button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Services Preview Section -->
+  <section class="services-preview">
+    <div class="container">
+      <h2 class="section-title">Our Featured Services</h2>
+      <div class="services-grid">
+        <ng-container *ngFor="let service of services">
+          <div class="service-card" (click)="goToService(service)">
+            <img [src]="service.icon" [alt]="service.title + ' Icon'" class="service-icon">
+            <h3>{{ service.title }}</h3>
+            <p>{{ service.description }}</p>
+          </div>
+        </ng-container>
+      </div>
+      <div class="text-center mt-4">
+        <app-button routerLink="/services" variant="outline">View All Services</app-button>
+      </div>
+    </div>
+  </section>
+
+  <section class="promotions-preview" *ngIf="promotions.length">
+    <div class="container">
+      <h2 class="section-title">Special Offers</h2>
+      <p class="section-subtitle">Save on your next cleaning service</p>
+
+      <div class="promotions-grid">
+        <div class="promotion-card text-content" *ngFor="let promo of promotions">
+          <div class="promo-top">
+            <span class="promo-badge" *ngIf="promo.label">{{ promo.label }}</span>
+            <span class="promo-discount">{{ promo.discountText }}</span>
+          </div>
+
+          <h3 class="promo-title">{{ promo.title }}</h3>
+          <p class="promo-description">{{ promo.description }}</p>
+
+          <div class="promo-actions">
+            <app-button
+              routerLink="/book-service"
+              [queryParams]="{ promo: promo.id, discount: 1 }"
+              fragment="booking-form"
+              variant="accent"
+              size="large"
+            >
+              Claim Offer
+            </app-button>
+            <app-button routerLink="/promotions" variant="outline" size="large">View Promotions</app-button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="testimonials bg-light">
+    <div class="container">
+      <h2 class="section-title">What Our Clients Say</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial-card" *ngFor="let t of testimonials">
+          <div class="testimonial-header">
+            <div class="avatar">{{ t.initials }}</div>
+            <div class="meta">
+              <p class="author">{{ t.name }}</p>
+              <div class="rating">⭐⭐⭐⭐⭐</div>
+            </div>
+          </div>
+          <p class="quote">"{{ t.text }}"</p>
+        </div>
+      </div>
+
+      <div class="google-rating-block">
+        <div class="google-stars">⭐⭐⭐⭐⭐</div>
+        <div class="google-rating-text">Rated 5.0 on Google</div>
+        <app-button variant="outline" size="large" (btnClick)="openGoogleReviews()">
+          See our reviews on Google
+        </app-button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta-section bg-secondary text-white">
+    <div class="container text-center">
+      <h2>Ready to Experience a Cleaner Space?</h2>
+      <p>Join hundreds of satisfied customers who trust ZCleanUp for their cleaning needs.</p>
+      <app-button routerLink="/book-service" size="large" variant="accent">Book Your First Cleaning Today</app-button>
+    </div>
+  </section>
+</div>

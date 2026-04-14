@@ -1,0 +1,100 @@
+.promotions-page {
+  padding: 3.5rem 0;
+}
+
+.promotions-header {
+  text-align: center;
+  margin-bottom: 3rem;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  p {
+    font-size: 1.15rem;
+    opacity: 0.8;
+  }
+}
+
+.promotions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2.5rem;
+}
+
+.promotion-card {
+  background: var(--white);
+  border-radius: var(--border-radius);
+  padding: 2.25rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(var(--secondary-color-rgb, 52, 152, 219), 0.12);
+  color: var(--secondary-color);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.promo-discount {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.85rem;
+  border-radius: 12px;
+  background: var(--secondary-color);
+  color: var(--white);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.promo-title {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--primary-color);
+}
+
+.promo-description {
+  opacity: 0.85;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.promo-actions {
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .promotions-header {
+    h1 {
+      font-size: 2.1rem;
+    }
+  }
+
+  .promotions-grid {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .promotion-card {
+    padding: 1.75rem;
+  }
+}

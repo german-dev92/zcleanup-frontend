@@ -1,0 +1,164 @@
+<div class="service-detail-page" *ngIf="service">
+  <section class="hero-service">
+    <div class="container hero-content">
+      <div class="hero-text">
+        <h1>{{ service.title }}</h1>
+        <p class="hero-desc">{{ service.description }}</p>
+        <app-button (btnClick)="bookNow()" [attr.data-service]="service.title" size="large" variant="accent">Book this Service</app-button>
+      </div>
+    </div>
+  </section>
+
+  <div class="container detail-content">
+    <div class="content-grid">
+      <div class="main-info">
+        <!-- Business Rule Alert -->
+        <section class="info-card business-rule" *ngIf="service.businessRule">
+          <div class="rule-alert">
+            <span class="rule-icon">⚠️</span>
+            <p>{{ service.businessRule }}</p>
+          </div>
+        </section>
+
+        <!-- Structured Sections (Client Data) -->
+        <ng-container *ngIf="service.sections">
+          <section class="info-card structured-section" *ngFor="let section of service.sections">
+            <h2>{{ section.title }}</h2>
+            <ul class="list-checked">
+              <li *ngFor="let item of section.items">
+                <span class="check">✓</span> {{ item }}
+              </li>
+            </ul>
+          </section>
+        </ng-container>
+
+        <!-- Standard Included List (Fallback) -->
+        <section class="info-card what-included" *ngIf="!service.sections && service.included">
+          <h2>What's Included</h2>
+          <ul class="list-checked">
+            <li *ngFor="let item of service.included">
+              <span class="check">✓</span> {{ item }}
+            </li>
+          </ul>
+        </section>
+
+        <ng-container *ngIf="service.slug === 'window-cleaning'; else nonWindowLanding">
+          <!-- Global Not Included Section -->
+          <section class="info-card what-not-included">
+            <h2>Not Included</h2>
+            <p class="section-intro">To maintain our high standards of safety and quality, the following are not included in our standard scope of work:</p>
+            <ul class="list-crossed">
+              <li *ngFor="let item of globalNotIncluded">
+                <span class="cross">×</span> {{ item }}
+              </li>
+            </ul>
+          </section>
+
+          <!-- Important Note -->
+          <section class="info-card important-note" *ngIf="service.details">
+            <h2>Important Note</h2>
+            <p class="note-text">{{ service.details }}</p>
+          </section>
+        </ng-container>
+        <ng-template #nonWindowLanding>
+          <section class="info-card what-not-included">
+            <h2>Not Included</h2>
+            <p class="section-intro">The following items are not included in the standard scope of this service:</p>
+            <ul class="list-crossed">
+              <li *ngFor="let item of (service.notIncluded?.length ? service.notIncluded : globalNotIncluded)">
+                <span class="cross">×</span> {{ item }}
+              </li>
+            </ul>
+          </section>
+
+          <section class="info-card what-included" *ngIf="landingAddOns.length">
+            <div class="addons-header">
+              <h2>Available Add-Ons</h2>
+              <button type="button" class="addons-modal-btn" (click)="openExclusionsModal()">Exclusion / Add-Ons</button>
+            </div>
+            <ul class="list-checked">
+              <li *ngFor="let item of landingAddOns">
+                <span class="check">✓</span> {{ item }}
+              </li>
+            </ul>
+          </section>
+        </ng-template>
+      </div>
+
+      <div class="exclusions-modal" *ngIf="isExclusionsModalOpen" (click)="closeExclusionsModal()">
+        <div class="exclusions-modal__content" (click)="$event.stopPropagation()">
+          <div class="exclusions-modal__header">
+            <h2>Add-Ons and Standard Exclusions</h2>
+            <button type="button" class="exclusions-modal__close" (click)="closeExclusionsModal()" aria-label="Close modal">×</button>
+          </div>
+
+          <p class="section-intro">This section clarifies optional upgrades and items that are outside the standard scope of service.</p>
+
+          <h3>Available Add-Ons</h3>
+          <ul class="list-checked">
+            <li *ngFor="let item of commonAddOns">
+              <span class="check">✓</span> {{ item }}
+            </li>
+          </ul>
+
+          <h3>Standard Exclusions</h3>
+          <ul class="list-crossed">
+            <li *ngFor="let item of commonStandardExclusions">
+              <span class="cross">×</span> {{ item }}
+            </li>
+          </ul>
+
+          <p class="note-text">{{ commonImportantNote }}</p>
+        </div>
+      </div>
+
+      <aside class="sidebar-info">
+        <div class="sticky-sidebar">
+          <div class="service-specs">
+            <div class="spec-item pricing-spec">
+              <span class="spec-label">💰 Pricing</span>
+              <span class="spec-value" *ngIf="service.basePrice && !service.priceNote">Starting at ${{ service.basePrice }}</span>
+              <span class="spec-value" *ngIf="service.priceNote">{{ service.priceNote }}</span>
+            </div>
+            <div class="spec-item" *ngIf="service.duration">
+              <span class="spec-label">⏱ Estimated Duration</span>
+              <span class="spec-value">{{ service.duration }}</span>
+            </div>
+            <div class="spec-item" *ngIf="service.frequency">
+              <span class="spec-label">📅 Recommended Frequency</span>
+              <span class="spec-value">{{ service.frequency }}</span>
+            </div>
+            <div class="spec-item" *ngIf="service.isRecurring">
+              <span class="spec-label">✨ Recurring Discounts</span>
+              <ul class="discount-list">
+                <li>Weekly: 12% off</li>
+                <li>Biweekly: 8% off</li>
+                <li>Monthly: 5% off</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="sidebar-cta">
+            <h3>Ready for a cleaner space?</h3>
+            <p>Schedule your {{ service.title }} in less than 2 minutes.</p>
+            <app-button (btnClick)="bookNow()" variant="accent" size="large">Get Started</app-button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials-section" *ngIf="service.testimonials?.length">
+      <h2 class="section-title">What Clients Say About Our {{ service.title }}</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial-card" *ngFor="let t of service.testimonials">
+          <div class="rating">
+            <span *ngFor="let star of [1,2,3,4,5]" [class.filled]="star <= t.rating">★</span>
+          </div>
+          <p class="quote">"{{ t.text }}"</p>
+          <p class="author">- {{ t.name }}</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

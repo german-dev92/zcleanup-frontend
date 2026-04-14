@@ -1,0 +1,29 @@
+<div class="zhero-slider" (mouseenter)="stopAuto()" (mouseleave)="autoCycle ? startAuto() : null">
+  <div class="zhero-slider__viewport">
+    <div class="zhero-slider__track" [style.transform]="'translate3d(-' + (currentIndex * 100) + 'vw, 0, 0)'">
+      <div class="zhero-slider__slide" *ngFor="let slide of slides">
+        <img class="zhero-slider__image" [src]="slide.src" [alt]="slide.alt">
+      </div>
+    </div>
+  </div>
+
+  <div class="zhero-slider__shade"></div>
+
+  <button class="zhero-slider__nav zhero-slider__nav--prev" type="button" (click)="prev()" aria-label="Previous slide">
+    <span class="zhero-slider__arrow zhero-slider__arrow--left"></span>
+  </button>
+  <button class="zhero-slider__nav zhero-slider__nav--next" type="button" (click)="next()" aria-label="Next slide">
+    <span class="zhero-slider__arrow zhero-slider__arrow--right"></span>
+  </button>
+
+  <div class="zhero-slider__dots" role="tablist" aria-label="Carousel pagination">
+    <button
+      class="zhero-slider__dot"
+      *ngFor="let slide of slides; let i = index"
+      type="button"
+      [class.is-active]="i === currentIndex"
+      (click)="goTo(i)"
+      [attr.aria-label]="'Go to slide ' + (i + 1)"
+    ></button>
+  </div>
+</div>
