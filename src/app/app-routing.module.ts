@@ -27,6 +27,10 @@ const routes: Routes = [
     loadChildren: () => import('./features/promotions/promotions.module').then(m => m.PromotionsModule)
   },
   {
+    path: 'admin/bookings',
+    loadChildren: () => import('./features/admin/bookings/admin-bookings.module').then(m => m.AdminBookingsModule)
+  },
+  {
     path: '**',
     redirectTo: ''
   }

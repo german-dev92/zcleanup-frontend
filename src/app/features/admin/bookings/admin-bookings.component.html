@@ -1,0 +1,109 @@
+<div class="admin-bookings">
+  <div class="admin-bookings__container">
+    <header class="page-header">
+      <div class="page-header__text">
+        <h1 class="page-header__title">Booking Management</h1>
+        <p class="page-header__subtitle">Manage and track all customer bookings</p>
+      </div>
+      <div class="page-header__meta">
+        <span class="count-badge">{{ bookings.length }} total</span>
+      </div>
+    </header>
+
+    <div class="state state--loading" *ngIf="isLoading">
+      <div class="spinner" aria-label="Loading"></div>
+      <div class="skeleton-list" aria-hidden="true">
+        <div class="booking-card booking-card--skeleton" *ngFor="let _ of skeletonRows">
+          <div class="booking-card__col booking-card__col--left">
+            <div class="skeleton-line skeleton-line--lg"></div>
+            <div class="skeleton-line skeleton-line--md"></div>
+          </div>
+          <div class="booking-card__col booking-card__col--center">
+            <div class="skeleton-line skeleton-line--md"></div>
+            <div class="skeleton-line skeleton-line--sm"></div>
+          </div>
+          <div class="booking-card__col booking-card__col--right">
+            <div class="skeleton-pill"></div>
+            <div class="skeleton-actions">
+              <div class="skeleton-btn"></div>
+              <div class="skeleton-btn"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="state state--error" *ngIf="!isLoading && errorMessage">
+      <div class="state-card">
+        <div class="state-card__icon">!</div>
+        <div class="state-card__text">
+          <div class="state-card__title">Something went wrong</div>
+          <div class="state-card__subtitle">{{ errorMessage }}</div>
+        </div>
+        <div class="state-card__actions">
+          <button type="button" class="btn btn--ghost" (click)="loadBookings()">Retry</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="state state--empty" *ngIf="!isLoading && !errorMessage && !bookings.length">
+      <div class="empty-state">
+        <div class="empty-state__icon">📭</div>
+        <div class="empty-state__title">No bookings found</div>
+        <div class="empty-state__subtitle">New bookings will appear here automatically</div>
+      </div>
+    </div>
+
+    <section class="bookings-list" *ngIf="!isLoading && !errorMessage && bookings.length">
+      <article class="booking-card" *ngFor="let b of bookings">
+        <div class="booking-card__col booking-card__col--left">
+          <div class="customer">
+            <div class="customer__name">{{ b.name }}</div>
+            <div class="customer__email">{{ b.email }}</div>
+          </div>
+        </div>
+
+        <div class="booking-card__col booking-card__col--center">
+          <div class="details">
+            <div class="details__row">
+              <span class="details__label">Service</span>
+              <span class="details__value">{{ b.cleaningType }}</span>
+            </div>
+            <div class="details__row">
+              <span class="details__label">Schedule</span>
+              <span class="details__value">{{ b.desiredDate }} · {{ b.desiredTime }}</span>
+            </div>
+            <div class="details__row details__row--muted">
+              <span class="details__label">Address</span>
+              <span class="details__value">{{ b.address }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="booking-card__col booking-card__col--right">
+          <div class="status">
+            <span class="status-badge" [ngClass]="getStatusClass(b.status)">{{ getStatusLabel(b.status) }}</span>
+          </div>
+          <div class="actions">
+            <button
+              type="button"
+              class="btn btn--confirm"
+              (click)="updateStatus(b._id, 'confirmed')"
+              [disabled]="b.status === 'confirmed'"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              class="btn btn--cancel"
+              (click)="updateStatus(b._id, 'cancelled')"
+              [disabled]="b.status === 'cancelled'"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </article>
+    </section>
+  </div>
+</div>

@@ -16,6 +16,17 @@ export interface BookingRequest {
   finalPricePreview: number;
 }
 
+export interface Booking {
+  _id: string;
+  name: string;
+  email: string;
+  address: string;
+  cleaningType: string;
+  desiredDate: string;
+  desiredTime: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+}
+
 export type BookingDynamicFields = {
   windowsQuantity?: number;
   laundryLoads?: number;
