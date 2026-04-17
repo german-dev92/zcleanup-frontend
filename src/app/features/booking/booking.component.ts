@@ -1,19 +1,19 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Subject, merge, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, map, switchMap, takeUntil } from 'rxjs/operators';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BookingService } from '../../core/services/booking.service';
 import { ServiceDataService } from '../../core/services/service-data.service';
-import { PricingService } from '../../core/services/pricing.service';
+import { APARTMENT_PACKAGES, DEEP_PACKAGES, EXTRAS_CATALOG, EXTRA_ALIASES, ExtraCatalogItem, MOVE_IN_PACKAGES, MOVE_OUT_PACKAGES, PricingService, STANDARD_PACKAGES } from '../../core/services/pricing.service';
 import { CleaningService } from '../../core/models/service.model';
-import { Extra } from '../../core/models/extra.model';
+import { LocationResult } from '../../core/models/location.model';
 import { SafeLoggerService } from '../../core/services/safe-logger.service';
 import { sanitizeAddress, sanitizeEmail, sanitizeMultiline, sanitizeObjectDeep, sanitizeText } from '../../shared/security/input-sanitizer';
 import { noControlChars, noHtmlLikeInput, trimmedMinLength } from '../../shared/security/security-validators';
 
 import { GeolocationService } from '../../core/services/geolocation.service';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 
 @Component({
   selector: 'app-booking',
@@ -47,44 +47,28 @@ export class BookingComponent implements OnInit, OnDestroy {
   coverageMessage = '';
   coverageCity = '';
   coverageCitiesList: string[] = [];
+  isCheckingDiscount = false;
+  isDiscountBlocked = false;
+  discountCheckMessage = '';
 
   private destroy$ = new Subject<void>();
+  private serviceChange$ = new Subject<void>();
+  private discountCheckRequestId = 0;
+  private lastCheckedDiscountEmail = '';
+  private currentLocationRequestId = 0;
 
-  standardPackages = [
-    { id: '1-1', bedrooms: 1, bathrooms: 1, price: 120 },
-    { id: '2-1', bedrooms: 2, bathrooms: 1, price: 140 },
-    { id: '2-2', bedrooms: 2, bathrooms: 2, price: 160 },
-    { id: '3-2', bedrooms: 3, bathrooms: 2, price: 180 },
-    { id: '4-2', bedrooms: 4, bathrooms: 2, price: 210 },
-    { id: '4-3', bedrooms: 4, bathrooms: 3, price: 250 }
-  ];
-  apartmentPackages = [
-    { id: '1-1', bedrooms: 1, bathrooms: 1, price: 110 },
-    { id: '2-1', bedrooms: 2, bathrooms: 1, price: 130 },
-    { id: '2-2', bedrooms: 2, bathrooms: 2, price: 140 },
-    { id: '3-2', bedrooms: 3, bathrooms: 2, price: 170 },
-    { id: '4-2', bedrooms: 4, bathrooms: 2, price: 190 }
-  ];
-  deepPackages = [
-    { id: '1-1', bedrooms: 1, bathrooms: 1, price: 180 },
-    { id: '2-2', bedrooms: 2, bathrooms: 2, price: 240 },
-    { id: '3-2', bedrooms: 3, bathrooms: 2, price: 280 },
-    { id: '4-3', bedrooms: 4, bathrooms: 3, price: 360 }
-  ];
-  moveOutPackages = [
-    { id: '1-1', bedrooms: 1, bathrooms: 1, price: 185 },
-    { id: '2-2', bedrooms: 2, bathrooms: 2, price: 250 },
-    { id: '3-2', bedrooms: 3, bathrooms: 2, price: 290 },
-    { id: '4-3', bedrooms: 4, bathrooms: 3, price: 365 }
-  ];
-  moveInPackages = [
-    { id: '1-1', bedrooms: 1, bathrooms: 1, price: 120 },
-    { id: '2-1', bedrooms: 2, bathrooms: 1, price: 130 },
-    { id: '2-2', bedrooms: 2, bathrooms: 2, price: 130 },
-    { id: '3-2', bedrooms: 3, bathrooms: 2, price: 150 },
-    { id: '4-2', bedrooms: 4, bathrooms: 2, price: 170 },
-    { id: '4-3', bedrooms: 4, bathrooms: 3, price: 170 }
-  ];
+  emailControl!: FormControl;
+  discountControl!: FormControl;
+  desiredTimeControl!: FormControl;
+  petsAtHomeControl!: FormControl;
+  useOwnProductsControl!: FormControl;
+
+  standardPackages = STANDARD_PACKAGES;
+  apartmentPackages = APARTMENT_PACKAGES;
+  deepPackages = DEEP_PACKAGES;
+  moveOutPackages = MOVE_OUT_PACKAGES;
+  moveInPackages = MOVE_IN_PACKAGES;
+  extrasCatalog: ExtraCatalogItem[] = EXTRAS_CATALOG;
 
   constructor(
     private fb: FormBuilder,
@@ -96,24 +80,6 @@ export class BookingComponent implements OnInit, OnDestroy {
     private logger: SafeLoggerService
   ) {}
 
-  getExtraDisplay(extra: { name: string; label: string }): string {
-    const name = extra.name;
-    const map: Record<string, string> = {
-      fridge: '+$30',
-      oven: '+$30',
-      cabinets: '+$35',
-      windows_exterior: '+$8 per window',
-      windows_ext: '+$8 per window',
-      heavy_buildup: '+$25',
-      same_day: '+$20',
-      garage: '+$30',
-      laundry: '+$15 per load (max 2)',
-      organize_clothes: '+$30'
-    };
-    const price = map[name] ?? '';
-    return price ? `${extra.label} (${price})` : extra.label;
-  }
-
   ngOnInit(): void {
     const std = this.serviceData.getServiceBySlug('standard-cleaning') || null;
     this.availableServices = this.serviceData.getEnabledServices();
@@ -123,18 +89,42 @@ export class BookingComponent implements OnInit, OnDestroy {
     if (std) {
       this.bookingForm.patchValue({ cleaningType: std.slug }, { emitEvent: false });
       this.setupStandardCleaningFields();
+      this.subscribeDynamicFieldsPricing();
       this.updatePrice();
     }
     
-    // Listen for address changes to validate coverage
     this.bookingForm.get('address')?.valueChanges
       .pipe(
         debounceTime(1000),
         distinctUntilChanged(),
+        takeUntil(this.destroy$),
+        switchMap((address) => {
+          const value = String(address ?? '');
+          if (!value || value.length < 10) {
+            this.resetCoverageState();
+            return of({ address: value, result: null as LocationResult | null });
+          }
+
+          this.isCheckingCoverage = true;
+          this.coverageMessage = 'Verifying your address...';
+          return this.geolocationService.geocodeAddress(value).pipe(
+            catchError(() => of(null)),
+            map((result) => ({ address: value, result }))
+          );
+        })
+      )
+      .subscribe(({ address, result }) => {
+        this.applyCoverageFromGeocode(address, result);
+      });
+
+    this.bookingForm.get('email')?.valueChanges
+      .pipe(
+        debounceTime(400),
+        distinctUntilChanged(),
         takeUntil(this.destroy$)
       )
-      .subscribe(address => {
-        this.validateCoverage(address);
+      .subscribe(email => {
+        this.validateDiscountAvailability(email);
       });
 
     // Listen for service changes to update dynamic fields
@@ -144,66 +134,62 @@ export class BookingComponent implements OnInit, OnDestroy {
         this.onServiceChange(slug);
       });
 
-    // Listen for any form changes to update price
-    this.bookingForm.valueChanges
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(value => {
-        this.updatePrice();
-      });
+    this.subscribeSharedPricingControls();
 
     this.checkQueryParams();
   }
 
-  validateCoverage(address: string): void {
-    if (!address || address.length < 10) {
+  private resetCoverageState(): void {
+    this.isCheckingCoverage = false;
+    this.coverageStatus = 'outside';
+    this.isExtraCharge = false;
+    this.assignedDistance = 0;
+    this.coverageCity = '';
+    this.coverageMessage = '';
+    this.updatePrice();
+  }
+
+  private applyCoverageFromGeocode(inputAddress: string, result: LocationResult | null): void {
+    const value = String(inputAddress ?? '');
+    if (!value || value.length < 10) return;
+
+    this.isCheckingCoverage = false;
+    if (!result) {
       this.coverageStatus = 'outside';
+      this.coverageMessage = "We couldn't verify this address. Please ensure it's correct and located in Florida.";
       this.isExtraCharge = false;
       this.assignedDistance = 0;
       this.coverageCity = '';
-      this.coverageMessage = '';
       this.updatePrice();
       return;
     }
 
-    this.isCheckingCoverage = true;
-    this.coverageMessage = 'Verifying your address...';
-    
-    this.geolocationService.geocodeAddress(address).subscribe(result => {
-      this.isCheckingCoverage = false;
-      if (result) {
-        // Update form with the formatted address from Google for better accuracy
-        this.bookingForm.patchValue({ address: result.address }, { emitEvent: false });
-        
-        const coverage = this.geolocationService.isWithinCoverage(result.lat, result.lng);
-        this.coverageStatus = coverage.status;
-        this.isExtraCharge = coverage.isExtraCharge;
-        this.assignedDistance = coverage.distance || 0;
-        
-        if (coverage.status !== 'outside') {
-          this.coverageCity = coverage.city || '';
-          if (coverage.isExtraCharge) {
-            this.coverageMessage = `Great news! We cover ${coverage.city} (${this.assignedDistance}km from center). Note: A $20 distance surcharge applies to this borderline area.`;
-          } else {
-            this.coverageMessage = `Great news! We cover ${coverage.city} (${this.assignedDistance}km from center).`;
-          }
-          this.updatePrice();
-        } else {
-          this.coverageMessage = "Sorry, we currently do not serve your location.";
-          this.updatePrice();
-        }
+    this.bookingForm.patchValue({ address: result.address }, { emitEvent: false });
+
+    const coverage = this.geolocationService.isWithinCoverage(result.lat, result.lng);
+    this.coverageStatus = coverage.status;
+    this.isExtraCharge = coverage.isExtraCharge;
+    this.assignedDistance = coverage.distance || 0;
+
+    if (coverage.status !== 'outside') {
+      this.coverageCity = coverage.city || '';
+      if (coverage.isExtraCharge) {
+        this.coverageMessage = `Great news! We cover ${coverage.city} (${this.assignedDistance}km from center). Note: A $20 distance surcharge applies to this borderline area.`;
       } else {
-        this.coverageStatus = 'outside';
-        this.coverageMessage = "We couldn't verify this address. Please ensure it's correct and located in Florida.";
-        this.isExtraCharge = false;
-        this.assignedDistance = 0;
-        this.coverageCity = '';
-        this.updatePrice();
+        this.coverageMessage = `Great news! We cover ${coverage.city} (${this.assignedDistance}km from center).`;
       }
-    });
+      this.updatePrice();
+      return;
+    }
+
+    this.coverageMessage = 'Sorry, we currently do not serve your location.';
+    this.updatePrice();
   }
 
   useCurrentLocation(): void {
     if ('geolocation' in navigator) {
+      const requestId = ++this.currentLocationRequestId;
+      const addressBefore = String(this.bookingForm.get('address')?.value ?? '');
       this.isCheckingCoverage = true;
       this.coverageMessage = 'Locating you...';
       
@@ -229,7 +215,10 @@ export class BookingComponent implements OnInit, OnDestroy {
             
             // Reverse geocode to get a real address
             this.geolocationService.reverseGeocode(lat, lng).subscribe(address => {
+              if (requestId !== this.currentLocationRequestId) return;
               this.isCheckingCoverage = false;
+              const currentAddress = String(this.bookingForm.get('address')?.value ?? '');
+              if (currentAddress !== addressBefore) return;
               if (address) {
                 this.bookingForm.patchValue({ address: address }, { emitEvent: false });
               } else {
@@ -257,6 +246,8 @@ export class BookingComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.serviceChange$.next();
+    this.serviceChange$.complete();
   }
 
   initForm(): void {
@@ -303,10 +294,17 @@ export class BookingComponent implements OnInit, OnDestroy {
       frequency: ['one-time'],
       extras: this.fb.array([])
     });
+
+    this.emailControl = this.bookingForm.get('email') as FormControl;
+    this.discountControl = this.bookingForm.get('applyFirstDiscount') as FormControl;
+    this.desiredTimeControl = this.bookingForm.get('desiredTime') as FormControl;
+    this.petsAtHomeControl = this.bookingForm.get('petsAtHome') as FormControl;
+    this.useOwnProductsControl = this.bookingForm.get('useOwnProducts') as FormControl;
   }
 
   onServiceChange(slug: string): void {
     this.selectedService = this.serviceData.getServiceBySlug(slug) || null;
+    this.serviceChange$.next();
     const dynamicGroup = this.bookingForm.get('dynamicFields') as FormGroup;
     
     // Clear existing dynamic fields
@@ -330,6 +328,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.setupWindowCleaningFields();
     }
     
+    this.subscribeDynamicFieldsPricing();
     this.updatePrice();
   }
 
@@ -344,16 +343,14 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     this.syncStandardSelection();
     dynamicGroup.get('stdPackage')?.valueChanges
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntil(merge(this.destroy$, this.serviceChange$)))
       .subscribe(() => {
         this.syncStandardSelection();
-        this.updatePrice();
       });
     dynamicGroup.get('extraBedrooms')?.valueChanges
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntil(merge(this.destroy$, this.serviceChange$)))
       .subscribe(() => {
         this.syncStandardSelection();
-        this.updatePrice();
       });
   }
 
@@ -366,13 +363,11 @@ export class BookingComponent implements OnInit, OnDestroy {
     dynamicGroup.addControl('bathrooms', new FormControl(1, [Validators.required, Validators.min(1), Validators.max(10)]));
     this.ensureCommonDynamicFields(dynamicGroup);
     this.syncApartmentSelection();
-    dynamicGroup.get('aptPackage')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('aptPackage')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncApartmentSelection();
-      this.updatePrice();
     });
-    dynamicGroup.get('aptExtraBedrooms')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('aptExtraBedrooms')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncApartmentSelection();
-      this.updatePrice();
     });
   }
 
@@ -397,13 +392,11 @@ export class BookingComponent implements OnInit, OnDestroy {
     dynamicGroup.addControl('bathrooms', new FormControl(1, [Validators.required, Validators.min(1), Validators.max(10)]));
     this.ensureCommonDynamicFields(dynamicGroup);
     this.syncDeepSelection();
-    dynamicGroup.get('deepPackage')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('deepPackage')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncDeepSelection();
-      this.updatePrice();
     });
-    dynamicGroup.get('deepExtraBedrooms')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('deepExtraBedrooms')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncDeepSelection();
-      this.updatePrice();
     });
   }
 
@@ -436,24 +429,19 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.ensureCommonDynamicFields(dynamicGroup);
     this.syncMoveOutSelection();
     this.syncMoveInSelection();
-    dynamicGroup.get('moveMode')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
-      this.updatePrice();
+    dynamicGroup.get('moveMode')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
     });
-    dynamicGroup.get('moPackage')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('moPackage')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncMoveOutSelection();
-      this.updatePrice();
     });
-    dynamicGroup.get('miPackage')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('miPackage')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncMoveInSelection();
-      this.updatePrice();
     });
-    dynamicGroup.get('moveOutExtraBedrooms')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('moveOutExtraBedrooms')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncMoveOutSelection();
-      this.updatePrice();
     });
-    dynamicGroup.get('moveInExtraBedrooms')?.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
+    dynamicGroup.get('moveInExtraBedrooms')?.valueChanges.pipe(takeUntil(merge(this.destroy$, this.serviceChange$))).subscribe(() => {
       this.syncMoveInSelection();
-      this.updatePrice();
     });
   }
 
@@ -579,6 +567,31 @@ export class BookingComponent implements OnInit, OnDestroy {
     return values.includes(name);
   }
 
+  private subscribeSharedPricingControls(): void {
+    this.bookingForm.get('frequency')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.updatePrice();
+      });
+
+    this.discountControl.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.updatePrice();
+      });
+  }
+
+  private subscribeDynamicFieldsPricing(): void {
+    const dynamicGroup = this.bookingForm.get('dynamicFields') as FormGroup | null;
+    if (!dynamicGroup) return;
+
+    dynamicGroup.valueChanges
+      .pipe(takeUntil(merge(this.destroy$, this.serviceChange$)))
+      .subscribe(() => {
+        this.updatePrice();
+      });
+  }
+
   updatePrice(): void {
     if (!this.selectedService) {
       this.estimatedPrice = 0;
@@ -657,6 +670,86 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.bookingForm.patchValue({ cleaningType: slug });
   }
 
+  onEmailBlur(): void {
+    this.validateDiscountAvailability(this.bookingForm.get('email')?.value, true);
+  }
+
+  private validateDiscountAvailability(rawEmail: unknown, forceCheck: boolean = false): void {
+    const applyDiscountControl = this.bookingForm.get('applyFirstDiscount');
+    const emailControl = this.bookingForm.get('email');
+    if (!applyDiscountControl || !emailControl) return;
+
+    const normalizedEmail = String(rawEmail ?? '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      this.resetDiscountAvailabilityState();
+      return;
+    }
+
+    if (!normalizedEmail.includes('@')) {
+      this.isDiscountBlocked = false;
+      applyDiscountControl.enable({ emitEvent: false });
+      applyDiscountControl.setValue(false, { emitEvent: false });
+      return;
+    }
+
+    if (emailControl.invalid) {
+      this.resetDiscountAvailabilityState();
+      return;
+    }
+
+    if (!forceCheck && normalizedEmail === this.lastCheckedDiscountEmail) {
+      return;
+    }
+
+    this.lastCheckedDiscountEmail = normalizedEmail;
+    this.isCheckingDiscount = true;
+    const requestId = ++this.discountCheckRequestId;
+
+    this.bookingService.checkDiscount(normalizedEmail).subscribe({
+      next: (response) => {
+        if (requestId !== this.discountCheckRequestId) return;
+        this.isCheckingDiscount = false;
+
+        if (response?.canUseDiscount === false) {
+          applyDiscountControl.setValue(false, { emitEvent: true });
+          applyDiscountControl.disable({ emitEvent: false });
+          this.isDiscountBlocked = true;
+          this.discountCheckMessage = '⚠️ This email already used the 15% first-time discount';
+          return;
+        }
+
+        if (applyDiscountControl.disabled) {
+          applyDiscountControl.enable({ emitEvent: false });
+        }
+        this.isDiscountBlocked = false;
+        this.discountCheckMessage = '';
+      },
+      error: (error) => {
+        if (requestId !== this.discountCheckRequestId) return;
+        this.isCheckingDiscount = false;
+        if (applyDiscountControl.disabled) {
+          applyDiscountControl.enable({ emitEvent: false });
+        }
+        this.isDiscountBlocked = false;
+        this.discountCheckMessage = 'Unable to verify discount availability right now.';
+        this.logger.warn('Discount check failed', error);
+      }
+    });
+  }
+
+  private resetDiscountAvailabilityState(): void {
+    const applyDiscountControl = this.bookingForm.get('applyFirstDiscount');
+    if (!applyDiscountControl) return;
+
+    this.isCheckingDiscount = false;
+    this.isDiscountBlocked = false;
+    this.discountCheckMessage = '';
+    this.lastCheckedDiscountEmail = '';
+    if (applyDiscountControl.disabled) {
+      applyDiscountControl.enable({ emitEvent: false });
+    }
+  }
+
   onSubmit(): void {
     if (this.coverageStatus === 'outside') {
       this.coverageMessage = 'Service is not available in your area.';
@@ -690,6 +783,12 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   private submitBooking(): void {
+    const discountControl = this.discountControl;
+
+    if (this.isDiscountBlocked && discountControl?.value) {
+      discountControl.setValue(false, { emitEvent: false });
+    }
+
     this.isSubmitting = true;
     const bookingData = this.buildSanitizedBookingData();
 
@@ -697,13 +796,21 @@ export class BookingComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.isSubmitting = false;
         this.submitSuccess = response.success;
-        this.submitMessage = response.message;
+        const discountApplied = response?.discountApplied;
+        const discountFeedback =
+          discountApplied === true
+            ? '🎉 Your 15% first-time discount was applied successfully!'
+            : discountApplied === false
+              ? '⚠️ This email has already used the 15% first-time discount.'
+              : '';
+        this.submitMessage = [response.message, discountFeedback].filter(Boolean).join(' ');
         if (response.success) {
           this.bookingForm.reset({
             frequency: 'one-time',
             petsAtHome: false,
             useOwnProducts: false
           });
+          this.resetDiscountAvailabilityState();
           this.selectedService = null;
           this.estimatedPrice = 0;
           this.confirmSnapshot = null;
@@ -712,7 +819,34 @@ export class BookingComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.isSubmitting = false;
         this.submitSuccess = false;
-        this.submitMessage = 'An error occurred. Please try again later.';
+        const httpError = error instanceof HttpErrorResponse ? error : null;
+        const status = httpError?.status;
+        const backendMessage =
+          typeof httpError?.error?.message === 'string'
+            ? httpError.error.message
+            : typeof httpError?.message === 'string'
+              ? httpError.message
+              : '';
+
+        if (status === 409) {
+          this.discountControl.setValue(false, { emitEvent: true });
+          this.discountControl.disable({ emitEvent: false });
+          this.isDiscountBlocked = true;
+          this.discountCheckMessage = '⚠️ This email already used the 15% first-time discount';
+          this.submitMessage = backendMessage || 'This email has already used the first-time discount.';
+
+          const bookingId = (httpError?.error as any)?.bookingId;
+          if (typeof bookingId === 'string' && bookingId) {
+            this.logger.warn('Booking conflict (409) bookingId', bookingId);
+          } else {
+            this.logger.warn('Booking conflict (409)', httpError);
+          }
+
+          this.updatePrice();
+          return;
+        }
+
+        this.submitMessage = backendMessage || 'An error occurred. Please try again later.';
         this.logger.error('Booking error', error);
       }
     });
@@ -750,19 +884,13 @@ export class BookingComponent implements OnInit, OnDestroy {
     const windowsQty = Number(raw?.dynamicFields?.windowsQuantity ?? 1);
     const laundryLoads = Number(raw?.dynamicFields?.laundryLoads ?? 1);
 
-    const extrasPretty = extras.map((name) => {
-      if (name === 'windows_exterior') return `Outside Windows (Qty: ${Number.isFinite(windowsQty) ? windowsQty : 1})`;
-      if (name === 'laundry') return `Laundry (Loads: ${Number.isFinite(laundryLoads) ? laundryLoads : 1})`;
-      const labelMap: Record<string, string> = {
-        fridge: 'Inside Fridge',
-        oven: 'Inside Oven',
-        cabinets: 'Inside Cabinets/Drawers',
-        heavy_buildup: 'Heavy Buildup',
-        same_day: 'Same Day',
-        garage: 'Garage',
-        organize_clothes: 'Organize Clothes'
-      };
-      return labelMap[name] ?? name;
+    const extrasPretty = extras.map((rawName) => {
+      const name = EXTRA_ALIASES[rawName] ?? rawName;
+      const catalogItem = this.extrasCatalog.find(e => e.id === name);
+      const label = catalogItem?.label ?? name;
+      if (name === 'windows_exterior') return `${label} (Qty: ${Number.isFinite(windowsQty) ? windowsQty : 1})`;
+      if (name === 'laundry') return `${label} (Loads: ${Number.isFinite(laundryLoads) ? laundryLoads : 1})`;
+      return label;
     });
 
     const details: Array<{ label: string; value: string }> = [];

@@ -557,6 +557,74 @@
 
   .checkbox-group {
     justify-content: center;
+
+    .discount-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .discount-option--blocked {
+      .checkbox-label {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      input[type="checkbox"] {
+        accent-color: #bdbdbd;
+        cursor: not-allowed;
+      }
+    }
+
+    .discount-option__info {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.12);
+      color: #333;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      position: relative;
+      user-select: none;
+    }
+
+    .discount-option__info:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(100% + 10px);
+      background: rgba(0, 0, 0, 0.88);
+      color: #fff;
+      padding: 0.5rem 0.75rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      line-height: 1.25;
+      width: max-content;
+      max-width: 260px;
+      white-space: normal;
+      z-index: 10;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .discount-option__info:hover::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(100% + 4px);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid rgba(0, 0, 0, 0.88);
+      z-index: 11;
+    }
+
     .checkbox-label {
       display: flex;
       align-items: center;

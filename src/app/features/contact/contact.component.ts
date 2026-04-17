@@ -50,6 +50,7 @@ export class ContactComponent implements OnInit {
   initMapData(): void {
     const cities = this.geolocationService.getCoverageCitiesDetails();
     const primaryColor = '#3498db'; // Default primary blue color
+    const googleAnimationDrop = (window as any)?.google?.maps?.Animation?.DROP;
 
     this.markers = cities.map(city => ({
       position: { lat: city.lat, lng: city.lng },
@@ -60,7 +61,7 @@ export class ContactComponent implements OnInit {
         fontSize: '12px'
       },
       title: city.name,
-      options: { animation: google.maps.Animation.DROP }
+      options: googleAnimationDrop ? { animation: googleAnimationDrop } : {}
     }));
 
     this.circles = cities.map(city => ({

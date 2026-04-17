@@ -185,17 +185,7 @@ export class ServiceDataService {
       ],
       metaTitle: "Standard Cleaning Services | Regular Home Maintenance | ZCleanUp",
       metaDescription: "Professional standard cleaning for your home. Kitchen, bathrooms, and living areas sanitized and tidied.",
-      extras: this.commonExtras,
-      formBlueprint: [
-        { name: 'bedrooms', label: 'Bedrooms', type: 'number', min: 0, max: null, defaultValue: 1, required: true },
-        { name: 'bathrooms', label: 'Bathrooms', type: 'number', min: 1, max: null, defaultValue: 1, required: true },
-        { name: 'livingRooms', label: 'Living Rooms', type: 'number', min: 0, max: null, defaultValue: 1, required: true },
-        { name: 'condition', label: 'Home Condition', type: 'select', min: null, max: null, required: true, defaultValue: 'light', options: [
-          { label: 'Light (Regularly cleaned)', value: 'light' },
-          { label: 'Medium (Needs some attention)', value: 'medium' },
-          { label: 'Heavy (First time / Very dirty)', value: 'heavy' }
-        ]}
-      ]
+      extras: this.commonExtras
     },
     {
       id: '2',
@@ -268,16 +258,7 @@ export class ServiceDataService {
       ],
       metaTitle: "Deep Cleaning Services | Detailed Home Reset | ZCleanUp",
       metaDescription: "Intensive deep cleaning for your home. Detailed dusting, scrubbing, and attention to neglected areas.",
-      extras: this.commonExtras,
-      formBlueprint: [
-        { name: 'bedrooms', label: 'Bedrooms', type: 'number', min: 0, max: null, defaultValue: 1, required: true },
-        { name: 'bathrooms', label: 'Bathrooms', type: 'number', min: 1, max: null, defaultValue: 1, required: true },
-        { name: 'livingRooms', label: 'Living Rooms', type: 'number', min: 0, max: null, defaultValue: 1, required: true },
-        { name: 'condition', label: 'Home Condition', type: 'select', min: null, max: null, required: true, defaultValue: 'medium', options: [
-          { label: 'Medium (Needs some attention)', value: 'medium' },
-          { label: 'Heavy (First time / Very dirty)', value: 'heavy' }
-        ]}
-      ]
+      extras: this.commonExtras
     },
     {
       id: '3',
@@ -355,13 +336,7 @@ export class ServiceDataService {
       ],
       metaTitle: "Move-In/Move-Out Cleaning Services | ZCleanUp",
       metaDescription: "Moving? We'll make your home spotless for the next chapter. Detailed cleaning of empty homes.",
-      extras: this.commonExtras,
-      formBlueprint: [
-        { name: 'bedrooms', label: 'Bedrooms', type: 'number', min: 0, max: null, defaultValue: 1, required: true },
-        { name: 'bathrooms', label: 'Bathrooms', type: 'number', min: 1, max: null, defaultValue: 1, required: true },
-        { name: 'size', label: 'Approximate Size (sqft)', type: 'number', min: 0, max: null, placeholder: 'e.g. 1500', required: true },
-        { name: 'cleanInsideAppliances', label: 'Clean inside all appliances?', type: 'checkbox', min: null, max: null, defaultValue: true }
-      ]
+      extras: this.commonExtras
     },
     {
       id: '4',
@@ -424,17 +399,7 @@ export class ServiceDataService {
         "Specialty restoration work"
       ],
       metaTitle: "Post-Construction Cleaning | Renovation Dust Removal | ZCleanUp",
-      metaDescription: "Just finished a renovation? We'll handle the construction dust and debris.",
-      formBlueprint: [
-        { name: 'rooms', label: 'Number of Rooms', type: 'number', min: 1, max: null, defaultValue: 3, required: true },
-        { name: 'floors', label: 'Number of Floors', type: 'number', min: 1, max: null, defaultValue: 1, required: true },
-        { name: 'debrisType', label: 'Type of Debris', type: 'select', min: null, max: null, required: true, defaultValue: 'dust', options: [
-          { label: 'Light Dust', value: 'dust' },
-          { label: 'Heavy Dust & Residue', value: 'heavy_dust' },
-          { label: 'Minor Construction Debris', value: 'minor_debris' }
-        ]},
-        { name: 'size', label: 'Property Size (sqft)', type: 'number', min: 0, max: null, required: true }
-      ]
+      metaDescription: "Just finished a renovation? We'll handle the construction dust and debris."
     },
     {
       id: '5',
@@ -521,21 +486,7 @@ export class ServiceDataService {
       ],
       metaTitle: "Expert Apartment Cleaning | Condos & Studios | ZCleanUp",
       metaDescription: "Professional cleaning for condos and apartments. We focus on efficiency and organization in smaller spaces.",
-      extras: this.commonExtras,
-      formBlueprint: [
-        { name: 'rooms', label: 'Total Rooms', type: 'number', min: 1, max: null, defaultValue: 2, required: true },
-        { name: 'size', label: 'Apartment Size', type: 'select', min: null, max: null, required: true, defaultValue: 'studio', options: [
-          { label: 'Studio', value: 'studio' },
-          { label: '1 Bedroom', value: '1br' },
-          { label: '2 Bedrooms', value: '2br' },
-          { label: '3+ Bedrooms', value: '3br_plus' }
-        ]},
-        { name: 'condition', label: 'Condition', type: 'select', min: null, max: null, required: true, defaultValue: 'light', options: [
-          { label: 'Light', value: 'light' },
-          { label: 'Medium', value: 'medium' },
-          { label: 'Heavy', value: 'heavy' }
-        ]}
-      ]
+      extras: this.commonExtras
     },
     {
       id: '6',
@@ -563,11 +514,7 @@ export class ServiceDataService {
       ],
       details: "Professional streak-free results for both interior and reachable exterior glass. " + this.globalImportantNote,
       metaTitle: "Residential Window Cleaning | Streak-Free Glass | ZCleanUp",
-      metaDescription: "Let the light in with our professional window cleaning. 1st floor exterior and all interior glass serviced.",
-      formBlueprint: [
-        { name: 'units', label: 'Number of Windows', type: 'number', min: 1, max: null, defaultValue: 5, required: true },
-        { name: 'firstFloorOnly', label: 'I confirm all windows are on the 1st floor', type: 'checkbox', min: null, max: null, required: true, defaultValue: false }
-      ]
+      metaDescription: "Let the light in with our professional window cleaning. 1st floor exterior and all interior glass serviced."
     }
   ];
 

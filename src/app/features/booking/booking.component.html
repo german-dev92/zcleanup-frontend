@@ -23,7 +23,7 @@
 
               <div class="form-group">
                 <label for="email">Email Address</label>
-                <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')">
+                <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')" (blur)="onEmailBlur()">
                 <div *ngIf="isFieldInvalid('email')" class="error-msg">A valid email is required.</div>
               </div>
             </div>
@@ -93,8 +93,8 @@
               <div class="form-group">
                 <label for="desiredTime">Desired Time</label>
                 <input type="time" id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
-                <div *ngIf="isFieldInvalid('desiredTime') && bookingForm.get('desiredTime')?.errors?.['required']" class="error-msg">Please select a time.</div>
-                <div *ngIf="isFieldInvalid('desiredTime') && bookingForm.get('desiredTime')?.errors?.['outsideBusinessHours']" class="error-msg">Selected time is outside of business hours (8:00 AM – 6:00 PM).</div>
+                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['required']" class="error-msg">Please select a time.</div>
+                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['outsideBusinessHours']" class="error-msg">Selected time is outside of business hours (8:00 AM – 6:00 PM).</div>
               </div>
             </div>
 
@@ -106,7 +106,7 @@
                   <input type="checkbox" formControlName="petsAtHome" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
                   Pets at home (please take precautions)
                 </label>
-                <small class="helper-text" *ngIf="bookingForm.get('petsAtHome')?.value">We may contact you for additional details about your pet.</small>
+                <small class="helper-text" *ngIf="petsAtHomeControl?.value">We may contact you for additional details about your pet.</small>
               </div>
 
               <div class="checkbox-wrapper">
@@ -114,7 +114,7 @@
                   <input type="checkbox" formControlName="useOwnProducts" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
                   I prefer the team to use my own cleaning products
                 </label>
-                <small class="helper-text" *ngIf="bookingForm.get('useOwnProducts')?.value">We are not responsible for results when using client-provided products.</small>
+                <small class="helper-text" *ngIf="useOwnProductsControl?.value">We are not responsible for results when using client-provided products.</small>
               </div>
             </div>
 
@@ -290,55 +290,44 @@
       <div class="dynamic-fields-section booking-details-wrapper" *ngIf="selectedService" formGroupName="dynamicFields" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
         <h3 class="section-subtitle">Add Extras</h3>
         <div class="extras-grid">
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="fridge" [checked]="isExtraSelected('fridge')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Inside Fridge (+$30)
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="oven" [checked]="isExtraSelected('oven')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Inside Oven (+$30)
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="cabinets" [checked]="isExtraSelected('cabinets')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Inside Cabinets/Drawers (+$35)
-          </label>
-          <div class="checkbox-label" style="align-items: center;">
-            <label style="display:flex;align-items:center;gap:.5rem;">
-              <input type="checkbox" (change)="onExtraChange($event)" value="windows_exterior" [checked]="isExtraSelected('windows_exterior')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Outside Windows (+$8 per window)
-            </label>
-            <ng-container *ngIf="isExtraSelected('windows_exterior')">
-              <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
-              <small style="margin-left:0.75rem;">Number of windows: {{ windowsQuantitySelected }} selected</small>
-            </ng-container>
-          </div>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="heavy_buildup" [checked]="isExtraSelected('heavy_buildup')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Heavy Buildup (+$25)
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="same_day" [checked]="isExtraSelected('same_day')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Same Day (+$20)
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="garage" [checked]="isExtraSelected('garage')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Garage (+$30)
-          </label>
-          <div class="checkbox-label" style="align-items: center;">
-            <label style="display:flex;align-items:center;gap:.5rem;">
-              <input type="checkbox" (change)="onExtraChange($event)" value="laundry" [checked]="isExtraSelected('laundry')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Laundry (+$15 per load)
-            </label>
-            <ng-container *ngIf="isExtraSelected('laundry')">
-              <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
-              <small style="margin-left:0.75rem;">Number of loads: {{ laundryLoadsSelected }} selected</small>
-            </ng-container>
-          </div>
-          <label class="checkbox-label">
-            <input type="checkbox" (change)="onExtraChange($event)" value="organize_clothes" [checked]="isExtraSelected('organize_clothes')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Organize Clothes (+$30)
-          </label>
+          <ng-container *ngFor="let extra of extrasCatalog">
+            <div class="checkbox-label" style="align-items: center;" *ngIf="extra.id === 'windows_exterior' || extra.id === 'laundry'; else simpleExtra">
+              <label style="display:flex;align-items:center;gap:.5rem;">
+                <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                {{ extra.label }} ({{ extra.id === 'windows_exterior' ? '+$8 per window' : '+$15 per load' }})
+              </label>
+              <ng-container *ngIf="extra.id === 'windows_exterior' && isExtraSelected('windows_exterior')">
+                <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <small style="margin-left:0.75rem;">Number of windows: {{ windowsQuantitySelected }} selected</small>
+              </ng-container>
+              <ng-container *ngIf="extra.id === 'laundry' && isExtraSelected('laundry')">
+                <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <small style="margin-left:0.75rem;">Number of loads: {{ laundryLoadsSelected }} selected</small>
+              </ng-container>
+            </div>
+
+            <ng-template #simpleExtra>
+              <label class="checkbox-label">
+                <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                {{ extra.label }} (+${{ extra.fixedPrice }})
+              </label>
+            </ng-template>
+          </ng-container>
         </div>
       </div>
 
       <!-- Pricing Summary -->
       <div class="pricing-summary booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
         <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" formControlName="applyFirstDiscount" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+          <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
+          <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This email already used the 15% discount' : null">
+            <input type="checkbox" formControlName="applyFirstDiscount" [disabled]="(coverageStatus === 'outside' && !isCheckingCoverage) || isDiscountBlocked || isCheckingDiscount">
             Apply 15% first-service discount
           </label>
+          <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This email already used the 15% discount'">i</span>
+          </div>
+          <div class="price-note" *ngIf="isCheckingDiscount">Checking discount availability...</div>
+          <div class="price-note" *ngIf="discountCheckMessage">{{ discountCheckMessage }}</div>
         </div>
         <div class="price-box">
           <span class="price-label">Estimated Price:</span>

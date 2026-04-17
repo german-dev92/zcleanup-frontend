@@ -14,18 +14,6 @@ export interface ServiceSection {
   items: string[];
 }
 
-export interface FormField {
-  name: string;
-  label: string;
-  type: 'number' | 'text' | 'select' | 'checkbox' | 'radio';
-  placeholder?: string;
-  required?: boolean;
-  options?: { label: string; value: any }[];
-  min: number | null;
-  max: number | null;
-  defaultValue?: any;
-}
-
 export interface CleaningService {
   id: string;
   slug: string;
@@ -51,5 +39,4 @@ export interface CleaningService {
   extras?: Extra[];
   isRecurring?: boolean;
   businessRule?: string;
-  formBlueprint?: FormField[];
 }

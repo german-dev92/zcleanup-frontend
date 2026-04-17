@@ -1,6 +1,85 @@
 import { Injectable } from '@angular/core';
 import { CleaningService } from '../models/service.model';
-import { Extra } from '../models/extra.model';
+
+export type PackageOption = { id: string; bedrooms: number; bathrooms: number; price: number };
+
+export const STANDARD_PACKAGES: PackageOption[] = [
+  { id: '1-1', bedrooms: 1, bathrooms: 1, price: 120 },
+  { id: '2-1', bedrooms: 2, bathrooms: 1, price: 140 },
+  { id: '2-2', bedrooms: 2, bathrooms: 2, price: 160 },
+  { id: '3-2', bedrooms: 3, bathrooms: 2, price: 180 },
+  { id: '4-2', bedrooms: 4, bathrooms: 2, price: 210 },
+  { id: '4-3', bedrooms: 4, bathrooms: 3, price: 250 }
+];
+
+export const APARTMENT_PACKAGES: PackageOption[] = [
+  { id: '1-1', bedrooms: 1, bathrooms: 1, price: 110 },
+  { id: '2-1', bedrooms: 2, bathrooms: 1, price: 130 },
+  { id: '2-2', bedrooms: 2, bathrooms: 2, price: 140 },
+  { id: '3-2', bedrooms: 3, bathrooms: 2, price: 170 },
+  { id: '4-2', bedrooms: 4, bathrooms: 2, price: 190 }
+];
+
+export const DEEP_PACKAGES: PackageOption[] = [
+  { id: '1-1', bedrooms: 1, bathrooms: 1, price: 180 },
+  { id: '2-2', bedrooms: 2, bathrooms: 2, price: 240 },
+  { id: '3-2', bedrooms: 3, bathrooms: 2, price: 280 },
+  { id: '4-3', bedrooms: 4, bathrooms: 3, price: 360 }
+];
+
+export const MOVE_OUT_PACKAGES: PackageOption[] = [
+  { id: '1-1', bedrooms: 1, bathrooms: 1, price: 185 },
+  { id: '2-2', bedrooms: 2, bathrooms: 2, price: 250 },
+  { id: '3-2', bedrooms: 3, bathrooms: 2, price: 290 },
+  { id: '4-3', bedrooms: 4, bathrooms: 3, price: 365 }
+];
+
+export const MOVE_IN_PACKAGES: PackageOption[] = [
+  { id: '1-1', bedrooms: 1, bathrooms: 1, price: 120 },
+  { id: '2-1', bedrooms: 2, bathrooms: 1, price: 130 },
+  { id: '2-2', bedrooms: 2, bathrooms: 2, price: 130 },
+  { id: '3-2', bedrooms: 3, bathrooms: 2, price: 150 },
+  { id: '4-2', bedrooms: 4, bathrooms: 2, price: 170 },
+  { id: '4-3', bedrooms: 4, bathrooms: 3, price: 170 }
+];
+
+export type ExtraId =
+  | 'fridge'
+  | 'oven'
+  | 'cabinets'
+  | 'windows_exterior'
+  | 'heavy_buildup'
+  | 'same_day'
+  | 'garage'
+  | 'laundry'
+  | 'organize_clothes';
+
+export type ExtraCatalogItem = {
+  id: ExtraId;
+  label: string;
+  fixedPrice?: number;
+  unitPrice?: number;
+  quantityControl?: 'windowsQuantity' | 'laundryLoads';
+  maxQuantity?: number;
+};
+
+export const EXTRAS_CATALOG: ExtraCatalogItem[] = [
+  { id: 'fridge', label: 'Inside Fridge', fixedPrice: 30 },
+  { id: 'oven', label: 'Inside Oven', fixedPrice: 30 },
+  { id: 'cabinets', label: 'Inside Cabinets/Drawers', fixedPrice: 35 },
+  { id: 'windows_exterior', label: 'Outside Windows', unitPrice: 8, quantityControl: 'windowsQuantity' },
+  { id: 'heavy_buildup', label: 'Heavy Buildup', fixedPrice: 25 },
+  { id: 'same_day', label: 'Same Day', fixedPrice: 20 },
+  { id: 'garage', label: 'Garage', fixedPrice: 30 },
+  { id: 'laundry', label: 'Laundry', unitPrice: 15, quantityControl: 'laundryLoads', maxQuantity: 2 },
+  { id: 'organize_clothes', label: 'Organize Clothes', fixedPrice: 30 }
+];
+
+export const EXTRA_ALIASES: Record<string, ExtraId> = {
+  windows_ext: 'windows_exterior',
+  windowsExterior: 'windows_exterior',
+  baseboards: 'heavy_buildup'
+};
 
 @Injectable({
   providedIn: 'root'
@@ -50,39 +129,30 @@ export class PricingService {
     const bath = Number(fv?.bathrooms) || 0;
 
     if (slug === 'standard-cleaning') {
-      const base = this.lookupTablePrice([
-        { key: [1,1], value: 120 },
-        { key: [2,1], value: 140 },
-        { key: [2,2], value: 160 },
-        { key: [3,2], value: 180 },
-        { key: [4,2], value: 210 },
-        { key: [4,3], value: 250 },
-      ], ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.stdPackage, b, bath, 1, 1));
+      const base = this.lookupTablePrice(
+        this.toTableEntries(STANDARD_PACKAGES),
+        ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.stdPackage, b, bath, 1, 1)
+      );
 
       const extraBedrooms = this.clampInt(fv?.extraBedrooms, 0, 10);
       return base + extraBedrooms * 30;
     }
 
     if (slug === 'apartment-cleaning') {
-      const base = this.lookupTablePrice([
-        { key: [1,1], value: 110 },
-        { key: [2,1], value: 130 },
-        { key: [2,2], value: 140 },
-        { key: [3,2], value: 170 },
-        { key: [4,2], value: 190 },
-      ], ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.aptPackage, b, bath, 1, 1));
+      const base = this.lookupTablePrice(
+        this.toTableEntries(APARTMENT_PACKAGES),
+        ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.aptPackage, b, bath, 1, 1)
+      );
 
       const extraBedrooms = this.clampInt(fv?.aptExtraBedrooms, 0, 10);
       return base + extraBedrooms * 20;
     }
 
     if (slug === 'deep-cleaning') {
-      const base = this.lookupTablePrice([
-        { key: [1,1], value: 180 },
-        { key: [2,2], value: 240 },
-        { key: [3,2], value: 280 },
-        { key: [4,3], value: 360 },
-      ], ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.deepPackage, b, bath, 1, 1));
+      const base = this.lookupTablePrice(
+        this.toTableEntries(DEEP_PACKAGES),
+        ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.deepPackage, b, bath, 1, 1)
+      );
 
       const extraBedrooms = this.clampInt(fv?.deepExtraBedrooms, 0, 10);
       return base + extraBedrooms * 40;
@@ -95,12 +165,10 @@ export class PricingService {
       const moveOutBase = (() => {
         const fallbackBedrooms = Number(fv?.moveOutBedrooms ?? b) || 0;
         const fallbackBathrooms = Number(fv?.moveOutBathrooms ?? bath) || 0;
-        const base = this.lookupTablePrice([
-          { key: [1,1], value: 185 },
-          { key: [2,2], value: 250 },
-          { key: [3,2], value: 290 },
-          { key: [4,3], value: 365 },
-        ], ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.moPackage, fallbackBedrooms, fallbackBathrooms, 1, 1));
+        const base = this.lookupTablePrice(
+          this.toTableEntries(MOVE_OUT_PACKAGES),
+          ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.moPackage, fallbackBedrooms, fallbackBathrooms, 1, 1)
+        );
 
         const extraBedrooms = this.clampInt(fv?.moveOutExtraBedrooms, 0, 10);
         return base + extraBedrooms * 40;
@@ -109,14 +177,10 @@ export class PricingService {
       const moveInBase = (() => {
         const fallbackBedrooms = Number(fv?.moveInBedrooms ?? b) || 0;
         const fallbackBathrooms = Number(fv?.moveInBathrooms ?? bath) || 0;
-        const base = this.lookupTablePrice([
-          { key: [1,1], value: 120 },
-          { key: [2,1], value: 130 },
-          { key: [2,2], value: 130 },
-          { key: [3,2], value: 150 },
-          { key: [4,2], value: 170 },
-          { key: [4,3], value: 170 },
-        ], ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.miPackage, fallbackBedrooms, fallbackBathrooms, 1, 1));
+        const base = this.lookupTablePrice(
+          this.toTableEntries(MOVE_IN_PACKAGES),
+          ...this.getBedroomsBathroomsFromPackageOrFallback(fv?.miPackage, fallbackBedrooms, fallbackBathrooms, 1, 1)
+        );
 
         const extraBedrooms = this.clampInt(fv?.moveInExtraBedrooms, 0, 10);
         return base + extraBedrooms * 30;
@@ -152,30 +216,12 @@ export class PricingService {
     const picked: string[] = Array.isArray(fv?.extras) ? fv.extras : [];
     if (picked.length === 0) return 0;
 
-    // Quantity helpers (best-effort, optional)
     const windowsQty = this.clampInt(fv?.windowsQuantity ?? fv?.units ?? 1, 1, 5000);
     const laundryLoads = this.clampInt(fv?.laundryLoads ?? 1, 1, 2);
 
-    const priceMap: Record<string, number> = {
-      fridge: 30,
-      oven: 30,
-      cabinets: 35,
-      heavy_buildup: 25,
-      same_day: 20,
-      garage: 30,
-      organize_clothes: 30,
-    };
-
-    // Map common legacy names to new ones
-    const alias: Record<string, string> = {
-      windows_ext: 'windows_exterior',
-      windowsExterior: 'windows_exterior',
-      baseboards: 'heavy_buildup',
-    };
-
     let total = 0;
     for (const raw of picked) {
-      const name = alias[raw] ?? raw;
+      const name = (EXTRA_ALIASES[raw] ?? raw) as string;
       if (name === 'windows_exterior') {
         total += 8 * windowsQty;
         continue;
@@ -184,15 +230,21 @@ export class PricingService {
         total += 15 * laundryLoads;
         continue;
       }
-      const val = priceMap[name];
-      if (typeof val === 'number') total += val;
-      else {
-        // Fallback to existing service extras map if defined
-        const extra = service.extras?.find(e => e.name === raw || e.name === name);
-        if (extra) total += (extra.priceMin ?? 0);
+
+      const catalogItem = EXTRAS_CATALOG.find(e => e.id === name);
+      if (catalogItem && typeof catalogItem.fixedPrice === 'number') {
+        total += catalogItem.fixedPrice;
+        continue;
       }
+
+      const extra = service.extras?.find(e => e.name === raw || e.name === name);
+      if (extra) total += (extra.priceMin ?? 0);
     }
     return total;
+  }
+
+  private toTableEntries(packages: PackageOption[]): Array<{ key: [number, number], value: number }> {
+    return packages.map(p => ({ key: [p.bedrooms, p.bathrooms], value: p.price }));
   }
 
   private lookupTablePrice(entries: Array<{ key: [number, number], value: number }>, bedrooms: number, bathrooms: number): number {

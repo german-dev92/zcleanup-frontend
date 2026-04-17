@@ -1,15 +1,17 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Title, Meta } from '@angular/platform-browser';
 import { ServiceDataService } from '../../core/services/service-data.service';
 import { CleaningService } from '../../core/models/service.model';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-service-detail',
   templateUrl: './service-detail.component.html',
   styleUrls: ['./service-detail.component.scss']
 })
-export class ServiceDetailComponent implements OnInit {
+export class ServiceDetailComponent implements OnInit, OnDestroy {
   service?: CleaningService;
   globalNotIncluded: string[] = [];
   landingAddOns: string[] = [];
@@ -17,6 +19,7 @@ export class ServiceDetailComponent implements OnInit {
   commonStandardExclusions: string[] = [];
   commonImportantNote = '';
   isExclusionsModalOpen = false;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private route: ActivatedRoute,
@@ -33,7 +36,7 @@ export class ServiceDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe(params => {
+    this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const slug = params.get('slug');
       if (slug) {
         this.service = this.serviceData.getServiceBySlug(slug);
@@ -48,21 +51,24 @@ export class ServiceDetailComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    const existing = document.getElementById('service-jsonld');
+    existing?.remove();
+  }
+
   updateSEO(service: CleaningService): void {
     this.titleService.setTitle(service.metaTitle || `${service.title} | ZCleanUp`);
     this.metaService.updateTag({ name: 'description', content: service.metaDescription || service.description });
   }
 
   setStructuredData(service: CleaningService): void {
-    // Remove existing scripts to prevent duplicates
-    const existingScripts = document.querySelectorAll('script[type="application/ld+json"]');
-    existingScripts.forEach(script => {
-      if (script.textContent?.includes(service.title)) {
-        script.remove();
-      }
-    });
+    const existing = document.getElementById('service-jsonld');
+    existing?.remove();
 
     const script = document.createElement('script');
+    script.id = 'service-jsonld';
     script.type = 'application/ld+json';
     const jsonLd = {
       "@context": "https://schema.org",
