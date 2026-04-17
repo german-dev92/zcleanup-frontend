@@ -53,6 +53,7 @@ export interface BookingResponse {
   message: string;
   bookingId?: string;
   discountApplied?: boolean;
+  status?: 'pending' | 'confirmed' | 'cancelled';
 }
 
 export interface DiscountCheckResponse {

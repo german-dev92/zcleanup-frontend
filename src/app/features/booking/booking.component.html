@@ -7,6 +7,7 @@
 
     <div *ngIf="submitSuccess" class="alert alert-success">
       <p>{{ submitMessage }}</p>
+      <p *ngIf="submittedBookingStatus">{{ getStatusLabel(submittedBookingStatus) }}</p>
       <app-button (btnClick)="submitSuccess = false" variant="outline" size="small">Book Another Service</app-button>
     </div>
 
@@ -23,7 +24,7 @@
 
               <div class="form-group">
                 <label for="email">Email Address</label>
-                <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')" (blur)="onEmailBlur()">
+                <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')">
                 <div *ngIf="isFieldInvalid('email')" class="error-msg">A valid email is required.</div>
               </div>
             </div>
@@ -320,14 +321,15 @@
       <div class="pricing-summary booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
         <div class="checkbox-group">
           <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
-          <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This email already used the 15% discount' : null">
+          <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This address already used the 15% discount' : null">
             <input type="checkbox" formControlName="applyFirstDiscount" [disabled]="(coverageStatus === 'outside' && !isCheckingCoverage) || isDiscountBlocked || isCheckingDiscount">
             Apply 15% first-service discount
           </label>
-          <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This email already used the 15% discount'">i</span>
+          <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This address already used the 15% discount'">i</span>
           </div>
           <div class="price-note" *ngIf="isCheckingDiscount">Checking discount availability...</div>
           <div class="price-note" *ngIf="discountCheckMessage">{{ discountCheckMessage }}</div>
+          <div class="price-note">Discount applies per household/address.</div>
         </div>
         <div class="price-box">
           <span class="price-label">Estimated Price:</span>

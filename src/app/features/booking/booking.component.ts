@@ -25,6 +25,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   isSubmitting = false;
   submitSuccess = false;
   submitMessage = '';
+  submittedBookingStatus: 'pending' | 'confirmed' | 'cancelled' | null = null;
   isConfirmModalOpen = false;
   confirmSnapshot: any = null;
   
@@ -115,16 +116,6 @@ export class BookingComponent implements OnInit, OnDestroy {
       )
       .subscribe(({ address, result }) => {
         this.applyCoverageFromGeocode(address, result);
-      });
-
-    this.bookingForm.get('email')?.valueChanges
-      .pipe(
-        debounceTime(400),
-        distinctUntilChanged(),
-        takeUntil(this.destroy$)
-      )
-      .subscribe(email => {
-        this.validateDiscountAvailability(email);
       });
 
     // Listen for service changes to update dynamic fields
@@ -671,70 +662,13 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   onEmailBlur(): void {
-    this.validateDiscountAvailability(this.bookingForm.get('email')?.value, true);
+    return;
   }
 
   private validateDiscountAvailability(rawEmail: unknown, forceCheck: boolean = false): void {
-    const applyDiscountControl = this.bookingForm.get('applyFirstDiscount');
-    const emailControl = this.bookingForm.get('email');
-    if (!applyDiscountControl || !emailControl) return;
-
-    const normalizedEmail = String(rawEmail ?? '').trim().toLowerCase();
-    if (!normalizedEmail) {
-      this.resetDiscountAvailabilityState();
-      return;
-    }
-
-    if (!normalizedEmail.includes('@')) {
-      this.isDiscountBlocked = false;
-      applyDiscountControl.enable({ emitEvent: false });
-      applyDiscountControl.setValue(false, { emitEvent: false });
-      return;
-    }
-
-    if (emailControl.invalid) {
-      this.resetDiscountAvailabilityState();
-      return;
-    }
-
-    if (!forceCheck && normalizedEmail === this.lastCheckedDiscountEmail) {
-      return;
-    }
-
-    this.lastCheckedDiscountEmail = normalizedEmail;
-    this.isCheckingDiscount = true;
-    const requestId = ++this.discountCheckRequestId;
-
-    this.bookingService.checkDiscount(normalizedEmail).subscribe({
-      next: (response) => {
-        if (requestId !== this.discountCheckRequestId) return;
-        this.isCheckingDiscount = false;
-
-        if (response?.canUseDiscount === false) {
-          applyDiscountControl.setValue(false, { emitEvent: true });
-          applyDiscountControl.disable({ emitEvent: false });
-          this.isDiscountBlocked = true;
-          this.discountCheckMessage = '⚠️ This email already used the 15% first-time discount';
-          return;
-        }
-
-        if (applyDiscountControl.disabled) {
-          applyDiscountControl.enable({ emitEvent: false });
-        }
-        this.isDiscountBlocked = false;
-        this.discountCheckMessage = '';
-      },
-      error: (error) => {
-        if (requestId !== this.discountCheckRequestId) return;
-        this.isCheckingDiscount = false;
-        if (applyDiscountControl.disabled) {
-          applyDiscountControl.enable({ emitEvent: false });
-        }
-        this.isDiscountBlocked = false;
-        this.discountCheckMessage = 'Unable to verify discount availability right now.';
-        this.logger.warn('Discount check failed', error);
-      }
-    });
+    void rawEmail;
+    void forceCheck;
+    return;
   }
 
   private resetDiscountAvailabilityState(): void {
@@ -796,12 +730,13 @@ export class BookingComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.isSubmitting = false;
         this.submitSuccess = response.success;
+        this.submittedBookingStatus = response?.status ?? null;
         const discountApplied = response?.discountApplied;
         const discountFeedback =
           discountApplied === true
             ? '🎉 Your 15% first-time discount was applied successfully!'
             : discountApplied === false
-              ? '⚠️ This email has already used the 15% first-time discount.'
+              ? '⚠️ This address has already used the 15% first-time discount.'
               : '';
         this.submitMessage = [response.message, discountFeedback].filter(Boolean).join(' ');
         if (response.success) {
@@ -819,6 +754,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.isSubmitting = false;
         this.submitSuccess = false;
+        this.submittedBookingStatus = null;
         const httpError = error instanceof HttpErrorResponse ? error : null;
         const status = httpError?.status;
         const backendMessage =
@@ -832,8 +768,8 @@ export class BookingComponent implements OnInit, OnDestroy {
           this.discountControl.setValue(false, { emitEvent: true });
           this.discountControl.disable({ emitEvent: false });
           this.isDiscountBlocked = true;
-          this.discountCheckMessage = '⚠️ This email already used the 15% first-time discount';
-          this.submitMessage = backendMessage || 'This email has already used the first-time discount.';
+          this.discountCheckMessage = '⚠️ This address already used the 15% first-time discount';
+          this.submitMessage = backendMessage || 'This address has already used the first-time discount.';
 
           const bookingId = (httpError?.error as any)?.bookingId;
           if (typeof bookingId === 'string' && bookingId) {
@@ -850,6 +786,13 @@ export class BookingComponent implements OnInit, OnDestroy {
         this.logger.error('Booking error', error);
       }
     });
+  }
+
+  getStatusLabel(status: 'pending' | 'confirmed' | 'cancelled' | null | undefined): string {
+    if (status === 'pending') return '⏳ Pending confirmation';
+    if (status === 'confirmed') return '✅ Confirmed';
+    if (status === 'cancelled') return '❌ Cancelled';
+    return '';
   }
 
   private buildSanitizedBookingData(): any {
