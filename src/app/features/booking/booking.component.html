@@ -68,7 +68,6 @@
                   <select id="cleaningType" 
                           formControlName="cleaningType" 
                           [class.invalid]="isFieldInvalid('cleaningType')"
-                          [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"
                           class="rich-select">
                     <option value="" disabled selected>Select a professional cleaning service...</option>
                     <option *ngFor="let service of availableServices" [value]="service.slug">
@@ -87,13 +86,13 @@
             <div class="form-row mt-4">
               <div class="form-group">
                 <label for="desiredDate">Desired Date</label>
-                <input type="date" id="desiredDate" formControlName="desiredDate" [class.invalid]="isFieldInvalid('desiredDate')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <input type="date" id="desiredDate" formControlName="desiredDate" [class.invalid]="isFieldInvalid('desiredDate')">
                 <div *ngIf="isFieldInvalid('desiredDate')" class="error-msg">Please select a date.</div>
               </div>
 
               <div class="form-group">
                 <label for="desiredTime">Desired Time</label>
-                <input type="time" id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <input type="time" id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')">
                 <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['required']" class="error-msg">Please select a time.</div>
                 <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['outsideBusinessHours']" class="error-msg">Selected time is outside of business hours (8:00 AM – 6:00 PM).</div>
               </div>
@@ -104,7 +103,7 @@
 
               <div class="checkbox-wrapper">
                 <label class="checkbox-label">
-                  <input type="checkbox" formControlName="petsAtHome" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="checkbox" formControlName="petsAtHome">
                   Pets at home (please take precautions)
                 </label>
                 <small class="helper-text" *ngIf="petsAtHomeControl?.value">We may contact you for additional details about your pet.</small>
@@ -112,7 +111,7 @@
 
               <div class="checkbox-wrapper">
                 <label class="checkbox-label">
-                  <input type="checkbox" formControlName="useOwnProducts" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="checkbox" formControlName="useOwnProducts">
                   I prefer the team to use my own cleaning products
                 </label>
                 <small class="helper-text" *ngIf="useOwnProductsControl?.value">We are not responsible for results when using client-provided products.</small>
@@ -142,7 +141,7 @@
               <div class="form-group">
                 <label for="stdPackage">Bedrooms / Bathrooms</label>
                 <div class="select-wrapper">
-                  <select id="stdPackage" class="rich-select" formControlName="stdPackage" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <select id="stdPackage" class="rich-select" formControlName="stdPackage">
                     <option *ngFor="let pkg of standardPackages" [value]="pkg.id">
                       {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
                     </option>
@@ -154,7 +153,7 @@
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
                   <label for="extraBedrooms">Additional bedrooms: +$30 per bedroom</label>
-                  <input type="number" id="extraBedrooms" formControlName="extraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('extraBedrooms')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="number" id="extraBedrooms" formControlName="extraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('extraBedrooms')">
                   <div *ngIf="isFieldInvalid('extraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
@@ -166,7 +165,7 @@
               <div class="form-group">
                 <label for="aptPackage">Bedrooms / Bathrooms</label>
                 <div class="select-wrapper">
-                  <select id="aptPackage" class="rich-select" formControlName="aptPackage" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <select id="aptPackage" class="rich-select" formControlName="aptPackage">
                     <option *ngFor="let pkg of apartmentPackages" [value]="pkg.id">
                       {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
                     </option>
@@ -177,7 +176,7 @@
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
                   <label for="aptExtraBedrooms">Additional bedrooms: +$20 per bedroom</label>
-                  <input type="number" id="aptExtraBedrooms" formControlName="aptExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('aptExtraBedrooms')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="number" id="aptExtraBedrooms" formControlName="aptExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('aptExtraBedrooms')">
                   <div *ngIf="isFieldInvalid('aptExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
@@ -189,7 +188,7 @@
               <div class="form-group">
                 <label for="deepPackage">Bedrooms / Bathrooms</label>
                 <div class="select-wrapper">
-                  <select id="deepPackage" class="rich-select" formControlName="deepPackage" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <select id="deepPackage" class="rich-select" formControlName="deepPackage">
                     <option *ngFor="let pkg of deepPackages" [value]="pkg.id">
                       {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
                     </option>
@@ -200,7 +199,7 @@
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
                   <label for="deepExtraBedrooms">Additional bedrooms: +$40 per bedroom</label>
-                  <input type="number" id="deepExtraBedrooms" formControlName="deepExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('deepExtraBedrooms')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="number" id="deepExtraBedrooms" formControlName="deepExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('deepExtraBedrooms')">
                   <div *ngIf="isFieldInvalid('deepExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
@@ -210,16 +209,16 @@
             <div *ngIf="selectedService?.slug === 'move-in-move-out'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Move-In / Move-Out — Choose Mode and Size</h3>
               <div class="radio-group">
-                <label class="radio-label"><input type="radio" formControlName="moveMode" value="move_out" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Move-Out</label>
-                <label class="radio-label"><input type="radio" formControlName="moveMode" value="move_in" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Move-In</label>
-                <label class="radio-label"><input type="radio" formControlName="moveMode" value="both" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage"> Both</label>
+                <label class="radio-label"><input type="radio" formControlName="moveMode" value="move_out"> Move-Out</label>
+                <label class="radio-label"><input type="radio" formControlName="moveMode" value="move_in"> Move-In</label>
+                <label class="radio-label"><input type="radio" formControlName="moveMode" value="both"> Both</label>
               </div>
 
               <div class="form-grid" style="margin-top: 1rem;" *ngIf="bookingForm.get('dynamicFields.moveMode')?.value === 'move_out' || bookingForm.get('dynamicFields.moveMode')?.value === 'both'">
                 <div class="form-group full-width">
                   <label for="moPackage">Move-Out: Bedrooms / Bathrooms</label>
                   <div class="select-wrapper">
-                    <select id="moPackage" class="rich-select" formControlName="moPackage" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                    <select id="moPackage" class="rich-select" formControlName="moPackage">
                       <option *ngFor="let pkg of moveOutPackages" [value]="pkg.id">
                         {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
                       </option>
@@ -228,7 +227,7 @@
                   </div>
                   <div class="form-group" style="margin-top: 1rem;">
                     <label for="moveOutExtraBedrooms">Move-Out: Additional bedrooms: +$40 per bedroom</label>
-                    <input type="number" id="moveOutExtraBedrooms" formControlName="moveOutExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveOutExtraBedrooms')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                    <input type="number" id="moveOutExtraBedrooms" formControlName="moveOutExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveOutExtraBedrooms')">
                     <div *ngIf="isFieldInvalid('moveOutExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                   </div>
                 </div>
@@ -238,7 +237,7 @@
                 <div class="form-group full-width">
                   <label for="miPackage">Move-In: Bedrooms / Bathrooms</label>
                   <div class="select-wrapper">
-                    <select id="miPackage" class="rich-select" formControlName="miPackage" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                    <select id="miPackage" class="rich-select" formControlName="miPackage">
                       <option *ngFor="let pkg of moveInPackages" [value]="pkg.id">
                         {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
                       </option>
@@ -247,7 +246,7 @@
                   </div>
                   <div class="form-group" style="margin-top: 1rem;">
                     <label for="moveInExtraBedrooms">Move-In: Additional bedrooms: +$30 per bedroom</label>
-                    <input type="number" id="moveInExtraBedrooms" formControlName="moveInExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveInExtraBedrooms')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                    <input type="number" id="moveInExtraBedrooms" formControlName="moveInExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveInExtraBedrooms')">
                     <div *ngIf="isFieldInvalid('moveInExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                   </div>
                 </div>
@@ -260,12 +259,12 @@
               <div class="form-grid">
                 <div class="form-group">
                   <label for="hours">Hours</label>
-                  <input type="number" id="hours" formControlName="hours" min="1" max="200" [class.invalid]="isFieldInvalid('hours')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="number" id="hours" formControlName="hours" min="1" max="200" [class.invalid]="isFieldInvalid('hours')">
                   <div *ngIf="isFieldInvalid('hours')" class="error-msg">Enter hours ≥ 1.</div>
                 </div>
                 <div class="form-group">
                   <label for="cleaners">Number of Cleaners</label>
-                  <input type="number" id="cleaners" formControlName="cleaners" min="1" max="50" [class.invalid]="isFieldInvalid('cleaners')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                  <input type="number" id="cleaners" formControlName="cleaners" min="1" max="50" [class.invalid]="isFieldInvalid('cleaners')">
                   <div *ngIf="isFieldInvalid('cleaners')" class="error-msg">Enter cleaners ≥ 1.</div>
                 </div>
               </div>
@@ -276,7 +275,7 @@
               <h3 class="section-subtitle">Window Cleaning — Enter Quantity</h3>
               <div class="form-group">
                 <label for="units">Number of Windows</label>
-                <input type="number" id="units" formControlName="units" min="0" max="5000" [class.invalid]="isFieldInvalid('units')" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <input type="number" id="units" formControlName="units" min="0" max="5000" [class.invalid]="isFieldInvalid('units')">
                 <div *ngIf="isFieldInvalid('units')" class="error-msg">Enter a valid count.</div>
               </div>
             </div>
@@ -298,11 +297,11 @@
                 {{ extra.label }} ({{ extra.id === 'windows_exterior' ? '+$8 per window' : '+$15 per load' }})
               </label>
               <ng-container *ngIf="extra.id === 'windows_exterior' && isExtraSelected('windows_exterior')">
-                <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty">
                 <small style="margin-left:0.75rem;">Number of windows: {{ windowsQuantitySelected }} selected</small>
               </ng-container>
               <ng-container *ngIf="extra.id === 'laundry' && isExtraSelected('laundry')">
-                <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
+                <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)">
                 <small style="margin-left:0.75rem;">Number of loads: {{ laundryLoadsSelected }} selected</small>
               </ng-container>
             </div>
@@ -322,7 +321,7 @@
         <div class="checkbox-group">
           <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
           <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This address already used the 15% discount' : null">
-            <input type="checkbox" formControlName="applyFirstDiscount" [disabled]="(coverageStatus === 'outside' && !isCheckingCoverage) || isDiscountBlocked || isCheckingDiscount">
+            <input type="checkbox" formControlName="applyFirstDiscount">
             Apply 15% first-service discount
           </label>
           <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This address already used the 15% discount'">i</span>

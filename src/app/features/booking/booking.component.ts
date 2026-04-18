@@ -108,6 +108,7 @@ export class BookingComponent implements OnInit, OnDestroy {
 
           this.isCheckingCoverage = true;
           this.coverageMessage = 'Verifying your address...';
+          this.syncFormControlDisabledStates();
           return this.geolocationService.geocodeAddress(value).pipe(
             catchError(() => of(null)),
             map((result) => ({ address: value, result }))
@@ -128,6 +129,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.subscribeSharedPricingControls();
 
     this.checkQueryParams();
+    this.syncFormControlDisabledStates();
   }
 
   private resetCoverageState(): void {
@@ -137,6 +139,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.assignedDistance = 0;
     this.coverageCity = '';
     this.coverageMessage = '';
+    this.syncFormControlDisabledStates();
     this.updatePrice();
   }
 
@@ -151,6 +154,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.isExtraCharge = false;
       this.assignedDistance = 0;
       this.coverageCity = '';
+      this.syncFormControlDisabledStates();
       this.updatePrice();
       return;
     }
@@ -169,11 +173,13 @@ export class BookingComponent implements OnInit, OnDestroy {
       } else {
         this.coverageMessage = `Great news! We cover ${coverage.city} (${this.assignedDistance}km from center).`;
       }
+      this.syncFormControlDisabledStates();
       this.updatePrice();
       return;
     }
 
     this.coverageMessage = 'Sorry, we currently do not serve your location.';
+    this.syncFormControlDisabledStates();
     this.updatePrice();
   }
 
@@ -183,6 +189,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       const addressBefore = String(this.bookingForm.get('address')?.value ?? '');
       this.isCheckingCoverage = true;
       this.coverageMessage = 'Locating you...';
+      this.syncFormControlDisabledStates();
       
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -194,6 +201,7 @@ export class BookingComponent implements OnInit, OnDestroy {
           this.coverageStatus = coverage.status;
           this.isExtraCharge = coverage.isExtraCharge;
           this.assignedDistance = coverage.distance || 0;
+          this.syncFormControlDisabledStates();
           
           if (coverage.status !== 'outside') {
             this.coverageCity = coverage.city || '';
@@ -208,6 +216,7 @@ export class BookingComponent implements OnInit, OnDestroy {
             this.geolocationService.reverseGeocode(lat, lng).subscribe(address => {
               if (requestId !== this.currentLocationRequestId) return;
               this.isCheckingCoverage = false;
+              this.syncFormControlDisabledStates();
               const currentAddress = String(this.bookingForm.get('address')?.value ?? '');
               if (currentAddress !== addressBefore) return;
               if (address) {
@@ -222,12 +231,14 @@ export class BookingComponent implements OnInit, OnDestroy {
             this.coverageCity = '';
             this.isExtraCharge = false;
             this.assignedDistance = 0;
+            this.syncFormControlDisabledStates();
             this.updatePrice();
           }
         },
         (error) => {
           this.isCheckingCoverage = false;
           this.coverageMessage = "Unable to get your location. Please enter your address manually.";
+          this.syncFormControlDisabledStates();
         },
         { timeout: 10000 }
       );
@@ -597,7 +608,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     const applyDiscount = !!this.bookingForm.get('applyFirstDiscount')?.value;
 
     const formValue = {
-      ...this.bookingForm.get('dynamicFields')?.value,
+      ...(this.bookingForm.get('dynamicFields') as FormGroup | null)?.getRawValue(),
       frequency: this.bookingForm.get('frequency')?.value,
       extras: this.bookingForm.get('extras')?.value,
       applyDiscount
@@ -679,9 +690,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.isDiscountBlocked = false;
     this.discountCheckMessage = '';
     this.lastCheckedDiscountEmail = '';
-    if (applyDiscountControl.disabled) {
-      applyDiscountControl.enable({ emitEvent: false });
-    }
+    this.syncFormControlDisabledStates();
   }
 
   onSubmit(): void {
@@ -796,7 +805,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   private buildSanitizedBookingData(): any {
-    const raw = this.bookingForm.value;
+    const raw = this.bookingForm.getRawValue();
 
     const base = {
       ...raw,
@@ -817,6 +826,51 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
 
     return base;
+  }
+
+  private syncFormControlDisabledStates(): void {
+    if (!this.bookingForm) return;
+
+    const shouldDisableForCoverage = this.coverageStatus === 'outside' && !this.isCheckingCoverage;
+    const dynamicGroup = this.bookingForm.get('dynamicFields');
+
+    const coverageControlled = [
+      'cleaningType',
+      'desiredDate',
+      'desiredTime',
+      'petsAtHome',
+      'useOwnProducts',
+      'frequency'
+    ];
+
+    for (const name of coverageControlled) {
+      const control = this.bookingForm.get(name);
+      if (!control) continue;
+      if (shouldDisableForCoverage) {
+        if (!control.disabled) control.disable({ emitEvent: false });
+      } else {
+        if (control.disabled) control.enable({ emitEvent: false });
+      }
+    }
+
+    if (dynamicGroup) {
+      if (shouldDisableForCoverage) {
+        if (!dynamicGroup.disabled) dynamicGroup.disable({ emitEvent: false });
+      } else {
+        if (dynamicGroup.disabled) dynamicGroup.enable({ emitEvent: false });
+      }
+    }
+
+    const discountControl = this.bookingForm.get('applyFirstDiscount');
+    if (discountControl) {
+      const shouldDisableDiscount =
+        shouldDisableForCoverage || this.isDiscountBlocked || this.isCheckingDiscount;
+      if (shouldDisableDiscount) {
+        if (!discountControl.disabled) discountControl.disable({ emitEvent: false });
+      } else {
+        if (discountControl.disabled) discountControl.enable({ emitEvent: false });
+      }
+    }
   }
 
   private buildConfirmationSnapshot(): any {
