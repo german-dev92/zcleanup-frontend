@@ -86,15 +86,28 @@
             <div class="form-row mt-4">
               <div class="form-group">
                 <label for="desiredDate">Desired Date</label>
-                <input type="date" id="desiredDate" formControlName="desiredDate" [class.invalid]="isFieldInvalid('desiredDate')">
-                <div *ngIf="isFieldInvalid('desiredDate')" class="error-msg">Please select a date.</div>
+                <input
+                  type="date"
+                  id="desiredDate"
+                  formControlName="desiredDate"
+                  [attr.min]="minBookingDate"
+                  [attr.max]="maxBookingDate"
+                  [class.invalid]="isFieldInvalid('desiredDate')"
+                >
+                <div *ngIf="isFieldInvalid('desiredDate') && bookingForm.get('desiredDate')?.errors?.['required']" class="error-msg">Please select a date.</div>
+                <div *ngIf="isFieldInvalid('desiredDate') && (bookingForm.get('desiredDate')?.errors?.['pastDate'] || bookingForm.get('desiredDate')?.errors?.['invalidDateFormat'])" class="error-msg">Select a valid future date.</div>
+                <div *ngIf="isFieldInvalid('desiredDate') && bookingForm.get('desiredDate')?.errors?.['dateTooFar']" class="error-msg">Please select a date within the next year.</div>
               </div>
 
               <div class="form-group">
                 <label for="desiredTime">Desired Time</label>
-                <input type="time" id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')">
-                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['required']" class="error-msg">Please select a time.</div>
-                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['outsideBusinessHours']" class="error-msg">Selected time is outside of business hours (8:00 AM – 6:00 PM).</div>
+                <select id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')">
+                  <option value="" disabled>Choose a time slot...</option>
+                  <option *ngFor="let t of allowedTimes" [value]="t">{{ t }}</option>
+                </select>
+                <div class="helper-text">Choose a time slot (every 30 minutes).</div>
+                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['required']" class="error-msg">Please select a time slot.</div>
+                <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['invalidTimeSlot']" class="error-msg">Please choose a valid time slot.</div>
               </div>
             </div>
 

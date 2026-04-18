@@ -70,6 +70,23 @@ export class BookingComponent implements OnInit, OnDestroy {
   moveOutPackages = MOVE_OUT_PACKAGES;
   moveInPackages = MOVE_IN_PACKAGES;
   extrasCatalog: ExtraCatalogItem[] = EXTRAS_CATALOG;
+  readonly allowedTimes = [
+    '08:00', '08:30',
+    '09:00', '09:30',
+    '10:00', '10:30',
+    '11:00', '11:30',
+    '12:00', '12:30',
+    '13:00', '13:30',
+    '14:00', '14:30',
+    '15:00', '15:30',
+    '16:00', '16:30',
+    '17:00', '17:30',
+    '18:00', '18:30',
+    '19:00', '19:30',
+    '20:00'
+  ];
+  minBookingDate = this.formatDate(new Date());
+  maxBookingDate = this.formatDate(this.addYears(new Date(), 1));
 
   constructor(
     private fb: FormBuilder,
@@ -124,6 +141,19 @@ export class BookingComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(slug => {
         this.onServiceChange(slug);
+      });
+
+    this.bookingForm.get('desiredDate')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((raw) => {
+        const value = String(raw ?? '').trim();
+        if (!value) return;
+        const today = this.startOfDay(new Date());
+        const selected = this.parseIsoDate(value);
+        if (!selected) return;
+        if (selected.getTime() < today.getTime()) {
+          this.bookingForm.get('desiredDate')?.setValue(this.minBookingDate, { emitEvent: false });
+        }
       });
 
     this.subscribeSharedPricingControls();
@@ -283,8 +313,12 @@ export class BookingComponent implements OnInit, OnDestroy {
         noControlChars()
       ]],
       cleaningType: ['', [Validators.required]],
-      desiredDate: ['', [Validators.required]],
-      desiredTime: ['', [Validators.required, businessHoursTimeValidator('08:00', '18:00')]],
+      desiredDate: ['', [Validators.required, noPastDatesValidator(() => this.minBookingDate, () => this.maxBookingDate)]],
+      desiredTime: ['', [
+        Validators.required,
+        businessHoursTimeValidator('08:00', '20:00'),
+        allowedTimeSlotsValidator(this.allowedTimes)
+      ]],
       petsAtHome: [false],
       useOwnProducts: [false],
       applyFirstDiscount: [false],
@@ -302,6 +336,31 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.desiredTimeControl = this.bookingForm.get('desiredTime') as FormControl;
     this.petsAtHomeControl = this.bookingForm.get('petsAtHome') as FormControl;
     this.useOwnProductsControl = this.bookingForm.get('useOwnProducts') as FormControl;
+  }
+
+  private formatDate(date: Date): string {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const yyyy = String(d.getFullYear());
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private startOfDay(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private addYears(date: Date, years: number): Date {
+    const d = new Date(date);
+    d.setFullYear(d.getFullYear() + years);
+    return d;
+  }
+
+  private parseIsoDate(value: string): Date | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const d = new Date(`${value}T00:00:00`);
+    if (!Number.isFinite(d.getTime())) return null;
+    return this.startOfDay(d);
   }
 
   onServiceChange(slug: string): void {
@@ -982,4 +1041,35 @@ function parseTimeToMinutes(value: string): number | null {
   if (hours < 0 || hours > 23) return null;
   if (minutes < 0 || minutes > 59) return null;
   return hours * 60 + minutes;
+}
+
+function allowedTimeSlotsValidator(allowed: readonly string[]): ValidatorFn {
+  const allowedSet = new Set(allowed);
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = String(control.value ?? '').trim();
+    if (!value) return null;
+    return allowedSet.has(value) ? null : { invalidTimeSlot: true };
+  };
+}
+
+function noPastDatesValidator(getMinDate: () => string, getMaxDate: () => string): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = String(control.value ?? '').trim();
+    if (!value) return null;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return { invalidDateFormat: true };
+    }
+
+    const selected = new Date(`${value}T00:00:00`);
+    if (!Number.isFinite(selected.getTime())) {
+      return { invalidDateFormat: true };
+    }
+
+    const min = String(getMinDate() ?? '').trim();
+    const max = String(getMaxDate() ?? '').trim();
+    if (min && value < min) return { pastDate: true };
+    if (max && value > max) return { dateTooFar: true };
+    return null;
+  };
 }
