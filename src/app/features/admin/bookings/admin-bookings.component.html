@@ -7,6 +7,7 @@
       </div>
       <div class="page-header__meta">
         <span class="count-badge">{{ bookings.length }} total</span>
+        <button type="button" class="btn btn--ghost" (click)="logout()">Logout</button>
       </div>
     </header>
 
@@ -33,12 +34,14 @@
       </div>
     </div>
 
-    <div class="state state--error" *ngIf="!isLoading && errorMessage">
+    <div class="state state--error" *ngIf="!isLoading && (errorMessage || isUnauthorized || isForbidden)">
       <div class="state-card">
         <div class="state-card__icon">!</div>
         <div class="state-card__text">
           <div class="state-card__title">Something went wrong</div>
-          <div class="state-card__subtitle">{{ errorMessage }}</div>
+          <div class="state-card__subtitle" *ngIf="isUnauthorized">Session expired. Please sign in again.</div>
+          <div class="state-card__subtitle" *ngIf="isForbidden">Not authorized.</div>
+          <div class="state-card__subtitle" *ngIf="!isUnauthorized && !isForbidden">{{ errorMessage }}</div>
         </div>
         <div class="state-card__actions">
           <button type="button" class="btn btn--ghost" (click)="loadBookings()">Retry</button>
@@ -54,8 +57,8 @@
       </div>
     </div>
 
-    <section class="bookings-list" *ngIf="!isLoading && !errorMessage && bookings.length">
-      <article class="booking-card" *ngFor="let b of bookings">
+    <section class="bookings-list" *ngIf="!isLoading && !errorMessage && !isUnauthorized && !isForbidden && bookings.length">
+      <article class="booking-card" *ngFor="let b of bookings; trackBy: trackByBookingId">
         <div class="booking-card__col booking-card__col--left">
           <div class="customer">
             <div class="customer__name">{{ b.name }}</div>
@@ -89,7 +92,7 @@
               type="button"
               class="btn btn--confirm"
               (click)="updateStatus(b._id, 'confirmed')"
-              [disabled]="b.status === 'confirmed'"
+              [disabled]="isUpdating(b._id) || b.status === 'confirmed' || b.status === 'paid'"
             >
               Confirm
             </button>
@@ -97,7 +100,7 @@
               type="button"
               class="btn btn--cancel"
               (click)="updateStatus(b._id, 'cancelled')"
-              [disabled]="b.status === 'cancelled'"
+              [disabled]="isUpdating(b._id) || b.status === 'cancelled' || b.status === 'paid'"
             >
               Cancel
             </button>

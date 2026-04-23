@@ -2,6 +2,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
+import { SecurityStateService, SecurityUiState } from './core/services/security-state.service';
 
 @Component({
   selector: 'app-root',
@@ -10,9 +11,13 @@ import { filter, takeUntil } from 'rxjs/operators';
 })
 export class AppComponent implements OnDestroy {
   title = 'ZCleanUp';
+  securityState: SecurityUiState = { kind: 'none' };
   private destroy$ = new Subject<void>();
 
-  constructor(private router: Router) {
+  constructor(
+    private router: Router,
+    private security: SecurityStateService
+  ) {
     this.router.events
       .pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
@@ -21,6 +26,16 @@ export class AppComponent implements OnDestroy {
       .subscribe(() => {
         window.scrollTo(0, 0);
       });
+
+    this.security.state$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((state) => {
+        this.securityState = state;
+      });
+  }
+
+  dismissSecurityBanner(): void {
+    this.security.clear();
   }
 
   ngOnDestroy(): void {

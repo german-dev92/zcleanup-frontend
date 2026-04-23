@@ -7,8 +7,23 @@
 
     <div *ngIf="submitSuccess" class="alert alert-success">
       <p>{{ submitMessage }}</p>
+      <p *ngIf="isRefreshingBookingStatus">Refreshing booking status...</p>
+      <p *ngIf="isWaitingForConfirmation">Waiting for admin confirmation.</p>
+      <p *ngIf="paymentUiState === 'PENDING_PAYMENT'">Payment pending confirmation.</p>
+      <p *ngIf="paymentUiState === 'PAYMENT_CONFIRMED'">Payment confirmed.</p>
+      <p *ngIf="paymentUiState === 'PAYMENT_FAILED'">Payment failed.</p>
+      <p *ngIf="paymentStatusHint">{{ paymentStatusHint }}</p>
       <p *ngIf="submittedBookingStatus">{{ getStatusLabel(submittedBookingStatus) }}</p>
-      <app-button (btnClick)="submitSuccess = false" variant="outline" size="small">Book Another Service</app-button>
+      <app-button
+        *ngIf="submittedBookingStatus === 'confirmed'"
+        type="button"
+        variant="accent"
+        size="small"
+        (btnClick)="openPaymentIfConfirmed(submittedBookingId)"
+      >
+        Proceed to Payment
+      </app-button>
+      <app-button (btnClick)="submitSuccess = false; isWaitingForConfirmation = false" variant="outline" size="small">Book Another Service</app-button>
     </div>
 
     <form *ngIf="!submitSuccess" [formGroup]="bookingForm" (ngSubmit)="onSubmit()" class="booking-form">
@@ -70,7 +85,7 @@
                           [class.invalid]="isFieldInvalid('cleaningType')"
                           class="rich-select">
                     <option value="" disabled selected>Select a professional cleaning service...</option>
-                    <option *ngFor="let service of availableServices" [value]="service.slug">
+                    <option *ngFor="let service of availableServices; trackBy: trackByServiceSlug" [value]="service.slug">
                       {{ service.title }}
                     </option>
                   </select>
@@ -303,7 +318,7 @@
       <div class="dynamic-fields-section booking-details-wrapper" *ngIf="selectedService" formGroupName="dynamicFields" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
         <h3 class="section-subtitle">Add Extras</h3>
         <div class="extras-grid">
-          <ng-container *ngFor="let extra of extrasCatalog">
+          <ng-container *ngFor="let extra of extrasCatalog; trackBy: trackByExtraId">
             <div class="checkbox-label" style="align-items: center;" *ngIf="extra.id === 'windows_exterior' || extra.id === 'laundry'; else simpleExtra">
               <label style="display:flex;align-items:center;gap:.5rem;">
                 <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">

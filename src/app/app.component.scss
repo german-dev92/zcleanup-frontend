@@ -7,3 +7,35 @@
 .content-area {
   flex: 1;
 }
+
+.security-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  background: #fff3cd;
+  color: #664d03;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.security-banner--error {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.security-banner__text {
+  flex: 1;
+}
+
+.security-banner__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}

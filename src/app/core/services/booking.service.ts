@@ -18,6 +18,23 @@ export class BookingService {
 
   constructor(private http: HttpClient) {}
 
+  private normalizeApiBaseUrl(value: string): string {
+    let url = String(value ?? '').trim().replace(/\/+$/, '');
+    const lower = () => url.toLowerCase();
+
+    const stripSuffix = (suffix: string) => {
+      if (lower().endsWith(suffix)) {
+        url = url.slice(0, Math.max(0, url.length - suffix.length)).replace(/\/+$/, '');
+      }
+    };
+
+    stripSuffix('/api/booking');
+    stripSuffix('/booking');
+    stripSuffix('/api');
+
+    return url;
+  }
+
   // 🟢 Crear booking
   bookService(request: BookingRequest): Observable<BookingResponse> {
     const directUrl = `${this.apiBaseUrl}/booking`;
@@ -67,18 +84,14 @@ export class BookingService {
 
   updateStatus(id: string, status: 'confirmed' | 'cancelled'): Observable<Booking> {
     const encodedId = encodeURIComponent(String(id ?? '').trim());
-    const directUrl = `${this.apiBaseUrl}/booking/${encodedId}/status`;
-    const apiPrefixedUrl = `${this.apiBaseUrl}/api/booking/${encodedId}/status`;
+    const baseUrl = this.normalizeApiBaseUrl(this.apiBaseUrl);
+    const directUrl = `${baseUrl}/booking/${encodedId}/status`;
     const body = { status };
 
-    return this.http.patch<Booking>(directUrl, body).pipe(
-      catchError((err: any) => {
-        if (err?.status === 404) {
-          return this.http.patch<Booking>(apiPrefixedUrl, body);
-        }
-        return throwError(() => err);
-      })
-    );
+    if (!environment.production) {
+      console.log('[ADMIN PATCH FINAL URL]', directUrl);
+    }
+    return this.http.patch<Booking>(directUrl, body);
   }
 
   // 🔥 VALIDACIÓN DE DESCUENTO (VERSIÓN SEGURA Y CONSISTENTE)

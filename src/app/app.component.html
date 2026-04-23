@@ -1,4 +1,15 @@
 <div class="app-container">
+  <div
+    *ngIf="securityState.kind !== 'none'"
+    class="security-banner"
+    [class.security-banner--warn]="securityState.kind === 'session_expired' || securityState.kind === 'unauthorized'"
+    [class.security-banner--error]="securityState.kind === 'forbidden' || securityState.kind === 'error'"
+    role="status"
+    aria-live="polite"
+  >
+    <div class="security-banner__text">{{ securityState.message }}</div>
+    <button type="button" class="security-banner__close" (click)="dismissSecurityBanner()" aria-label="Dismiss">×</button>
+  </div>
   <app-navbar></app-navbar>
   
   <main class="content-area">

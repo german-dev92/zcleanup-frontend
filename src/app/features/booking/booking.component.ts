@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormControl, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
-import { Subject, merge, of } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Subject, merge, of, timer } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, map, switchMap, takeUntil } from 'rxjs/operators';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BookingService } from '../../core/services/booking.service';
@@ -15,6 +15,8 @@ import { noControlChars, noHtmlLikeInput, trimmedMinLength } from '../../shared/
 
 import { GeolocationService } from '../../core/services/geolocation.service';
 
+type PaymentUiState = 'NONE' | 'PENDING_PAYMENT' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED';
+
 @Component({
   selector: 'app-booking',
   templateUrl: './booking.component.html',
@@ -25,7 +27,15 @@ export class BookingComponent implements OnInit, OnDestroy {
   isSubmitting = false;
   submitSuccess = false;
   submitMessage = '';
-  submittedBookingStatus: 'pending' | 'confirmed' | 'cancelled' | null = null;
+  submittedBookingStatus: 'pending' | 'confirmed' | 'paid' | 'cancelled' | null = null;
+  submittedBookingId: string | null = null;
+  isWaitingForConfirmation = false;
+  isRefreshingBookingStatus = false;
+  isPaymentReturnContext = false;
+  isPaymentCancelContext = false;
+  paymentStatusHint = '';
+  paymentUiState: PaymentUiState = 'NONE';
+  syncedBooking: any = null;
   isConfirmModalOpen = false;
   confirmSnapshot: any = null;
   
@@ -57,6 +67,9 @@ export class BookingComponent implements OnInit, OnDestroy {
   private discountCheckRequestId = 0;
   private lastCheckedDiscountEmail = '';
   private currentLocationRequestId = 0;
+  private lastStatusRefreshBookingId: string | null = null;
+  private readonly bookingIdStorageKey = 'zcleanup_last_booking_id';
+  private readonly paymentPollStop$ = new Subject<void>();
 
   emailControl!: FormControl;
   discountControl!: FormControl;
@@ -95,6 +108,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     private pricingService: PricingService,
     private geolocationService: GeolocationService,
     private route: ActivatedRoute,
+    private router: Router,
     private logger: SafeLoggerService
   ) {}
 
@@ -276,6 +290,8 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.paymentPollStop$.next();
+    this.paymentPollStop$.complete();
     this.destroy$.next();
     this.destroy$.complete();
     this.serviceChange$.next();
@@ -699,6 +715,30 @@ export class BookingComponent implements OnInit, OnDestroy {
         const serviceName = String(params['serviceName'] ?? '').trim();
         const promo = String(params['promo'] ?? '').trim();
         const discountParam = String(params['discount'] ?? '').trim();
+        const bookingIdParam =
+          String(params['bookingId'] ?? params['booking'] ?? params['id'] ?? '').trim();
+        const sessionIdParam =
+          String(params['session_id'] ?? params['sessionId'] ?? '').trim();
+        const paymentReturnParam =
+          String(params['payment'] ?? params['fromStripe'] ?? params['stripe'] ?? '').trim();
+        const isPaymentReturn =
+          paymentReturnParam === '1' ||
+          paymentReturnParam.toLowerCase() === 'true' ||
+          !!sessionIdParam;
+        const isPaymentCancel = String(this.router.url ?? '').includes('/payment/cancel');
+        const isPaymentSuccess = String(this.router.url ?? '').includes('/payment/success');
+        const isPaymentContextFromPath = isPaymentCancel || isPaymentSuccess;
+
+        const storedBookingId = !bookingIdParam ? String(sessionStorage.getItem(this.bookingIdStorageKey) ?? '').trim() : '';
+        const effectiveBookingId = bookingIdParam || storedBookingId;
+        if (effectiveBookingId && effectiveBookingId !== this.lastStatusRefreshBookingId) {
+          this.refreshBookingStatus(effectiveBookingId, isPaymentReturn || isPaymentContextFromPath, isPaymentCancel);
+        } else if (!effectiveBookingId && (isPaymentReturn || isPaymentContextFromPath)) {
+          this.isPaymentReturnContext = true;
+          this.isPaymentCancelContext = isPaymentCancel;
+          this.paymentUiState = isPaymentCancel ? 'PAYMENT_FAILED' : 'PENDING_PAYMENT';
+          this.paymentStatusHint = isPaymentCancel ? 'Payment cancelled.' : 'Payment pending confirmation.';
+        }
 
         if (discountParam === '1' || promo) {
           this.bookingForm.get('applyFirstDiscount')?.setValue(true, { emitEvent: true });
@@ -711,13 +751,107 @@ export class BookingComponent implements OnInit, OnDestroy {
         if (service) {
           this.selectService(service.slug);
           this.scrollToBookingForm();
-          return;
         }
 
         if (discountParam === '1' || promo) {
           this.scrollToBookingForm();
         }
       });
+  }
+
+  private refreshBookingStatus(bookingId: string, isPaymentReturn: boolean, isPaymentCancel: boolean): void {
+    const id = String(bookingId ?? '').trim();
+    if (!id) return;
+
+    this.lastStatusRefreshBookingId = id;
+    this.isRefreshingBookingStatus = true;
+    this.isPaymentReturnContext = isPaymentReturn;
+    this.isPaymentCancelContext = isPaymentCancel;
+    this.paymentStatusHint = '';
+    this.paymentUiState = 'NONE';
+    this.syncedBooking = null;
+    this.paymentPollStop$.next();
+
+    sessionStorage.setItem(this.bookingIdStorageKey, id);
+
+    this.bookingService.getBookingById(id).subscribe({
+      next: (booking) => {
+        const status = (booking as any)?.status ?? null;
+        this.syncedBooking = booking;
+        this.submittedBookingId = (booking as any)?._id ?? id;
+        this.submittedBookingStatus = status;
+        this.submitSuccess = true;
+        this.isWaitingForConfirmation = status === 'pending';
+        this.submitMessage = this.getUserFriendlyStatusMessage(status);
+        this.paymentUiState = this.derivePaymentUiState(booking, isPaymentReturn, isPaymentCancel);
+        this.paymentStatusHint = this.getPaymentHint(this.paymentUiState, isPaymentReturn, isPaymentCancel);
+        this.isRefreshingBookingStatus = false;
+
+        if (isPaymentReturn && this.paymentUiState === 'PENDING_PAYMENT') {
+          this.startPaymentPolling(id, isPaymentCancel);
+        }
+      },
+      error: (error) => {
+        this.isRefreshingBookingStatus = false;
+        this.logger.error('Booking status refresh failed', error);
+      }
+    });
+  }
+
+  private startPaymentPolling(bookingId: string, isPaymentCancel: boolean): void {
+    const id = String(bookingId ?? '').trim();
+    if (!id) return;
+
+    timer(4000, 4000)
+      .pipe(
+        takeUntil(merge(this.destroy$, this.paymentPollStop$)),
+        switchMap(() =>
+          this.bookingService.getBookingById(id).pipe(
+            catchError(() => of(null))
+          )
+        )
+      )
+      .subscribe((booking) => {
+        if (!booking) return;
+        const status = (booking as any)?.status ?? null;
+        this.syncedBooking = booking;
+        this.submittedBookingId = (booking as any)?._id ?? id;
+        this.submittedBookingStatus = status;
+        this.isWaitingForConfirmation = status === 'pending';
+        this.submitMessage = this.getUserFriendlyStatusMessage(status);
+        this.paymentUiState = this.derivePaymentUiState(booking, true, isPaymentCancel);
+        this.paymentStatusHint = this.getPaymentHint(this.paymentUiState, true, isPaymentCancel);
+
+        if (this.paymentUiState === 'PAYMENT_CONFIRMED' || this.paymentUiState === 'PAYMENT_FAILED') {
+          this.paymentPollStop$.next();
+        }
+      });
+  }
+
+  private derivePaymentUiState(booking: unknown, isPaymentReturn: boolean, isPaymentCancel: boolean): PaymentUiState {
+    const anyBooking = booking as any;
+    const bookingStatus = String(anyBooking?.status ?? '').trim();
+    const paymentStatus = String(anyBooking?.payment?.status ?? '').trim();
+    const hasPaymentUrl = typeof anyBooking?.paymentUrl === 'string' && anyBooking.paymentUrl.trim().length > 0;
+
+    if (bookingStatus === 'paid' || paymentStatus === 'paid') return 'PAYMENT_CONFIRMED';
+    if (paymentStatus === 'failed') return 'PAYMENT_FAILED';
+
+    if (isPaymentCancel && bookingStatus !== 'paid') return 'PAYMENT_FAILED';
+
+    if (bookingStatus === 'confirmed') {
+      if (paymentStatus === 'pending' || hasPaymentUrl || isPaymentReturn) return 'PENDING_PAYMENT';
+    }
+
+    return 'NONE';
+  }
+
+  private getPaymentHint(state: PaymentUiState, isPaymentReturn: boolean, isPaymentCancel: boolean): string {
+    if (!isPaymentReturn) return '';
+    if (state === 'PAYMENT_CONFIRMED') return 'Payment confirmed.';
+    if (state === 'PAYMENT_FAILED') return isPaymentCancel ? 'Payment cancelled.' : 'Payment failed.';
+    if (state === 'PENDING_PAYMENT') return 'Payment pending confirmation.';
+    return '';
   }
 
   private scrollToBookingForm(): void {
@@ -796,17 +930,39 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     this.bookingService.bookService(bookingData).subscribe({
       next: (response) => {
+        const bookingId = this.extractBookingId(response);
+        const bookingStatus =
+          (response as any)?.status ??
+          (response as any)?.data?.status ??
+          null;
+        const discountApplied =
+          typeof (response as any)?.discountApplied === 'boolean'
+            ? (response as any).discountApplied
+            : typeof (response as any)?.data?.applyFirstDiscount === 'boolean'
+              ? (response as any).data.applyFirstDiscount
+              : undefined;
+
         this.isSubmitting = false;
         this.submitSuccess = response.success;
-        this.submittedBookingStatus = response?.status ?? null;
-        const discountApplied = response?.discountApplied;
+        this.submittedBookingId = bookingId;
+        this.submittedBookingStatus = bookingStatus;
+        this.isPaymentReturnContext = false;
+        this.isPaymentCancelContext = false;
+        this.paymentStatusHint = '';
+        this.paymentUiState = 'NONE';
+        this.syncedBooking = null;
+        this.paymentPollStop$.next();
+        if (bookingId) {
+          sessionStorage.setItem(this.bookingIdStorageKey, bookingId);
+        }
         const discountFeedback =
           discountApplied === true
             ? '🎉 Your 15% first-time discount was applied successfully!'
             : discountApplied === false
               ? '⚠️ This address has already used the 15% first-time discount.'
               : '';
-        this.submitMessage = [response.message, discountFeedback].filter(Boolean).join(' ');
+        const statusMessage = this.getUserFriendlyStatusMessage(bookingStatus);
+        this.submitMessage = [statusMessage, discountFeedback].filter(Boolean).join(' ');
         if (response.success) {
           this.bookingForm.reset({
             frequency: 'one-time',
@@ -817,11 +973,14 @@ export class BookingComponent implements OnInit, OnDestroy {
           this.selectedService = null;
           this.estimatedPrice = 0;
           this.confirmSnapshot = null;
+          this.isWaitingForConfirmation = true;
         }
       },
       error: (error) => {
         this.isSubmitting = false;
+        this.isWaitingForConfirmation = false;
         this.submitSuccess = false;
+        this.submittedBookingId = null;
         this.submittedBookingStatus = null;
         const httpError = error instanceof HttpErrorResponse ? error : null;
         const status = httpError?.status;
@@ -856,11 +1015,51 @@ export class BookingComponent implements OnInit, OnDestroy {
     });
   }
 
-  getStatusLabel(status: 'pending' | 'confirmed' | 'cancelled' | null | undefined): string {
+  openPaymentIfConfirmed(bookingId: string | null | undefined): void {
+    void bookingId;
+    return;
+  }
+
+  private getUserFriendlyStatusMessage(
+    status: 'pending' | 'confirmed' | 'paid' | 'cancelled' | null | undefined
+  ): string {
+    if (status === 'confirmed') return 'Confirmed. Ready for payment.';
+    if (status === 'paid') return 'Paid. Booking completed.';
+    if (status === 'cancelled') return 'Cancelled.';
+    return 'Booking submitted successfully. Waiting for admin approval.';
+  }
+
+  private extractBookingId(response: unknown): string | null {
+    const anyRes = response as any;
+    const candidates = [
+      anyRes?.data?._id,
+      anyRes?.bookingId,
+      anyRes?.data?.id,
+      anyRes?._id,
+      anyRes?.id
+    ];
+
+    for (const c of candidates) {
+      const value = String(c ?? '').trim();
+      if (value) return value;
+    }
+    return null;
+  }
+
+  getStatusLabel(status: 'pending' | 'confirmed' | 'paid' | 'cancelled' | null | undefined): string {
     if (status === 'pending') return '⏳ Pending confirmation';
     if (status === 'confirmed') return '✅ Confirmed';
+    if (status === 'paid') return '💳 Paid';
     if (status === 'cancelled') return '❌ Cancelled';
     return '';
+  }
+
+  trackByExtraId(_: number, item: ExtraCatalogItem): string {
+    return item.id;
+  }
+
+  trackByServiceSlug(_: number, item: CleaningService): string {
+    return item.slug;
   }
 
   private buildSanitizedBookingData(): any {

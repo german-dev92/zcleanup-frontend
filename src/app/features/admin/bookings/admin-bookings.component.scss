@@ -17,6 +17,12 @@
   margin-bottom: 20px;
 }
 
+.page-header__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .page-header__title {
   margin: 0;
   font-size: 28px;

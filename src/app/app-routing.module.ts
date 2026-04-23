@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './core/guards/admin.guard';
 
 const routes: Routes = [
   {
@@ -23,12 +24,25 @@ const routes: Routes = [
     loadChildren: () => import('./features/booking/booking.module').then(m => m.BookingModule)
   },
   {
+    path: 'payment/success',
+    loadChildren: () => import('./features/booking/booking.module').then(m => m.BookingModule)
+  },
+  {
+    path: 'payment/cancel',
+    loadChildren: () => import('./features/booking/booking.module').then(m => m.BookingModule)
+  },
+  {
     path: 'promotions',
     loadChildren: () => import('./features/promotions/promotions.module').then(m => m.PromotionsModule)
   },
   {
     path: 'admin/bookings',
+    canActivate: [AuthGuard],
     loadChildren: () => import('./features/admin/bookings/admin-bookings.module').then(m => m.AdminBookingsModule)
+  },
+  {
+    path: 'admin/login',
+    loadChildren: () => import('./features/admin/login/admin-login.module').then(m => m.AdminLoginModule)
   },
   {
     path: '**',

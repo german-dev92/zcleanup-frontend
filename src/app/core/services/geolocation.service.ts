@@ -89,7 +89,9 @@ export class GeolocationService {
           );
 
           if (!isInFlorida) {
-            console.warn('Address found but not in Florida:', result.formatted_address);
+            if (!environment.production) {
+              console.warn('Address found but not in Florida:', result.formatted_address);
+            }
             return null;
           }
 
@@ -102,15 +104,21 @@ export class GeolocationService {
         }
         
         if (response.status === 'ZERO_RESULTS') {
-          console.warn('No results found for address:', address);
+          if (!environment.production) {
+            console.warn('No results found for address:', address);
+          }
         } else if (response.status !== 'OK') {
-          console.error('Google Maps API error:', response.status, response.error_message);
+          if (!environment.production) {
+            console.error('Google Maps API error:', response.status, response.error_message);
+          }
         }
         
         return null;
       }),
       catchError(error => {
-        console.error('Geocoding HTTP error:', error);
+        if (!environment.production) {
+          console.error('Geocoding HTTP error:', error);
+        }
         return of(null);
       })
     );

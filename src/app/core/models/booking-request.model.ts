@@ -24,7 +24,12 @@ export interface Booking {
   cleaningType: string;
   desiredDate: string;
   desiredTime: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  paymentUrl?: string;
+  payment?: {
+    provider?: 'stripe' | 'square';
+    status?: 'pending' | 'paid' | 'failed' | 'refunded';
+  };
 }
 
 export type BookingDynamicFields = {
@@ -64,7 +69,19 @@ export interface BookingResponse {
   message: string;
   bookingId?: string;
   discountApplied?: boolean;
-  status?: 'pending' | 'confirmed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  data?: {
+    _id?: string;
+    status?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+    applyFirstDiscount?: boolean;
+    finalPricePreview?: number;
+    estimatedPrice?: number;
+  };
+  pricing?: {
+    finalPrice?: number;
+    estimatedPrice?: number;
+    discountApplied?: boolean;
+  };
 }
 
 export interface DiscountCheckResponse {

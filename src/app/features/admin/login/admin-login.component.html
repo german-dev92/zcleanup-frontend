@@ -1,0 +1,40 @@
+<div class="admin-login container">
+  <div class="admin-login__card">
+    <h1>Admin Login</h1>
+    <p class="admin-login__subtitle">Sign in to access the admin dashboard.</p>
+
+    <div class="alert alert-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        placeholder="admin@zcleanup.com"
+        [class.invalid]="form.get('email')?.invalid && (form.get('email')?.dirty || form.get('email')?.touched)"
+      />
+      <div class="error-msg" *ngIf="form.get('email')?.invalid && (form.get('email')?.dirty || form.get('email')?.touched)">
+        Email is required.
+      </div>
+
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        placeholder="Password"
+        [class.invalid]="form.get('password')?.invalid && (form.get('password')?.dirty || form.get('password')?.touched)"
+      />
+      <div class="error-msg" *ngIf="form.get('password')?.invalid && (form.get('password')?.dirty || form.get('password')?.touched)">
+        Password is required.
+      </div>
+
+      <div class="admin-login__actions">
+        <app-button type="submit" variant="primary" size="large" [loading]="isSubmitting" [disabled]="form.invalid || isSubmitting">
+          Sign In
+        </app-button>
+      </div>
+    </form>
+  </div>
+</div>

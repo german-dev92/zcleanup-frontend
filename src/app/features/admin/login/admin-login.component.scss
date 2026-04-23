@@ -1,0 +1,70 @@
+.admin-login {
+  padding: 3rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-login__card {
+  width: 100%;
+  max-width: 720px;
+  background: var(--white);
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.admin-login__subtitle {
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+textarea.invalid {
+  border-color: #e74c3c;
+}
+
+input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  font-size: 0.95rem;
+}
+
+input.invalid {
+  border-color: #e74c3c;
+}
+
+label {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.error-msg {
+  margin-top: 0.25rem;
+  color: #e74c3c;
+  font-size: 0.875rem;
+}
+
+.alert-error {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  background: #f8d7da;
+  color: #842029;
+  border: 1px solid #f5c2c7;
+}
+
+.admin-login__actions {
+  margin-top: 1.5rem;
+}
