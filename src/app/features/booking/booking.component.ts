@@ -554,7 +554,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     const dynamicGroup = this.bookingForm.get('dynamicFields') as FormGroup;
     Object.keys(dynamicGroup.controls).forEach(key => dynamicGroup.removeControl(key));
     dynamicGroup.addControl('hours', new FormControl(1, [Validators.required, Validators.min(1), Validators.max(200)]));
-    dynamicGroup.addControl('cleaners', new FormControl(1, [Validators.required, Validators.min(1), Validators.max(50)]));
+    dynamicGroup.addControl('cleaners', new FormControl(1, [Validators.required, Validators.min(1), Validators.max(3)]));
     this.ensureCommonDynamicFields(dynamicGroup);
   }
 
@@ -1190,6 +1190,8 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     const df = raw?.dynamicFields && typeof raw.dynamicFields === 'object' ? raw.dynamicFields : {};
     const dynamicFields: any = this.sanitizeDynamicFields(cleaningType, df, normalizedExtras);
+    const distanceSurcharge = !!this.isExtraCharge;
+    dynamicFields.distanceSurcharge = distanceSurcharge;
 
     const windowsQuantity = this.toInt(df?.windowsQuantity, 1, 5000, 1);
     const laundryLoads = this.toInt(df?.laundryLoads, 1, 2, 1);
@@ -1220,6 +1222,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       petsAtHome: !!raw?.petsAtHome,
       useOwnProducts: !!raw?.useOwnProducts,
       applyFirstDiscount: !!raw?.applyFirstDiscount,
+      distanceSurcharge,
       frequency,
       extras: extrasPayload,
       dynamicFields
@@ -1320,7 +1323,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       out.additionalBedrooms = additionalBedrooms;
     } else if (cleaningType === 'post-construction-cleaning') {
       const hours = this.toInt(df?.hours, 1, 200, 1);
-      const cleaners = this.toInt(df?.cleaners, 1, 50, 1);
+      const cleaners = this.toInt(df?.cleaners, 1, 3, 1);
       out.hours = hours;
       out.cleaners = cleaners;
       out.postConstruction = { hours, cleaners };

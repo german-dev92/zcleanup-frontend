@@ -71,7 +71,7 @@ describe('PricingService', () => {
     expect(both.basePrice).toBe(130 + 30 + 250 + 80);
   });
 
-  it('calculates post-construction pricing with independent hours and employees', () => {
+  it('calculates post-construction pricing linearly with a max of 3 cleaners', () => {
     const base = service.calculateBreakdown(
       { slug: 'post-construction-cleaning', type: 'standard' } as any,
       { hours: 1, cleaners: 1 },
@@ -91,7 +91,7 @@ describe('PricingService', () => {
       { hours: 1, cleaners: 4 },
       false
     ) as any;
-    expect(morePeople.basePrice).toBe(60 + 3 * 20);
+    expect(morePeople.basePrice).toBe(60 + 2 * 20);
 
     const both = service.calculateBreakdown(
       { slug: 'post-construction-cleaning', type: 'standard' } as any,

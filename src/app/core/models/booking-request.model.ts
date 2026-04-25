@@ -9,6 +9,7 @@ export interface BookingRequest {
   petsAtHome: boolean;
   useOwnProducts: boolean;
   applyFirstDiscount: boolean;
+  distanceSurcharge?: boolean;
   frequency: string;
   extras: string[];
   dynamicFields: BookingDynamicFields;
@@ -57,6 +58,7 @@ export interface Booking {
 }
 
 export type BookingDynamicFields = {
+  distanceSurcharge?: boolean;
   windowsQuantity?: number;
   laundryLoads?: number;
 

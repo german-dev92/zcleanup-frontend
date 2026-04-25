@@ -195,8 +195,10 @@ export class PricingService {
       const hours = Number(fv?.hours);
       const cleaners = Number(fv?.cleaners);
       if (Number.isFinite(hours) && Number.isFinite(cleaners) && hours >= 1 && cleaners >= 1) {
-        const extraHours = Math.max(0, Math.trunc(hours) - 1);
-        const extraCleaners = Math.max(0, Math.trunc(cleaners) - 1);
+        const h = Math.max(1, Math.trunc(hours));
+        const c = Math.min(3, Math.max(1, Math.trunc(cleaners)));
+        const extraHours = Math.max(0, h - 1);
+        const extraCleaners = Math.max(0, c - 1);
         return 60 + extraHours * 40 + extraCleaners * 20;
       }
       return 'custom';

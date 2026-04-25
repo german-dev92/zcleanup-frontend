@@ -3,7 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { finalize } from 'rxjs/operators';
 import { EmployeesService, type Employee } from '../../../../core/services/employees.service';
 
-type EmployeeRole = 'supervisor' | 'employee';
+type EmployeeRole = 'admin' | 'supervisor' | 'employee';
 
 @Component({
   selector: 'app-employee-management',
@@ -22,6 +22,7 @@ export class EmployeeManagementComponent implements OnInit {
   form!: FormGroup;
 
   readonly roleOptions: { value: EmployeeRole; label: string }[] = [
+    { value: 'admin', label: 'Admin' },
     { value: 'supervisor', label: 'Supervisor' },
     { value: 'employee', label: 'Employee' }
   ];
