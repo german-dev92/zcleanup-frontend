@@ -28,6 +28,21 @@ export class AdminLoginComponent implements OnInit {
     });
   }
 
+  private isAllowedReturnUrlForRole(returnUrl: string): boolean {
+    const url = String(returnUrl ?? '').trim();
+    if (!url.startsWith('/')) return false;
+
+    if (this.auth.isAdminOrSupervisor()) {
+      return url.startsWith('/admin/');
+    }
+
+    if (this.auth.isEmployee()) {
+      return url.startsWith('/employee-dashboard');
+    }
+
+    return false;
+  }
+
   submit(): void {
     if (this.isSubmitting) return;
     if (this.form.invalid) {
@@ -50,13 +65,24 @@ export class AdminLoginComponent implements OnInit {
       )
       .subscribe({
         next: () => {
-          if (!this.auth.isAdmin()) {
-            this.auth.clear();
-            this.errorMessage = 'Not authorized.';
+          const returnUrl = String(this.route.snapshot.queryParamMap.get('returnUrl') ?? '').trim();
+          if (returnUrl && this.isAllowedReturnUrlForRole(returnUrl)) {
+            void this.router.navigateByUrl(returnUrl);
             return;
           }
-          const returnUrl = String(this.route.snapshot.queryParamMap.get('returnUrl') ?? '').trim();
-          void this.router.navigateByUrl(returnUrl || '/admin/bookings');
+
+          if (this.auth.isAdminOrSupervisor()) {
+            void this.router.navigateByUrl('/admin/bookings');
+            return;
+          }
+
+          if (this.auth.isEmployee()) {
+            void this.router.navigateByUrl('/employee-dashboard');
+            return;
+          }
+
+          this.auth.clear();
+          this.errorMessage = 'Not authorized.';
         },
         error: () => {
           this.errorMessage = 'Invalid credentials.';

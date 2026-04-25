@@ -6,10 +6,76 @@
         <p class="page-header__subtitle">Manage and track all customer bookings</p>
       </div>
       <div class="page-header__meta">
-        <span class="count-badge">{{ bookings.length }} total</span>
-        <button type="button" class="btn btn--ghost" (click)="logout()">Logout</button>
+        <span class="count-badge">{{ filteredBookings.length }} shown · {{ bookings.length }} total</span>
+        <button type="button" class="btn btn--ghost" (click)="onLogout()">Logout</button>
       </div>
     </header>
+
+    <section class="filters" *ngIf="!isLoading && !errorMessage && !isUnauthorized && !isForbidden && bookings.length">
+      <div class="filters__header">
+        <div class="filters__title">Search & Filters</div>
+        <button type="button" class="btn btn--ghost btn--tiny" (click)="clearFilters()" [disabled]="!hasActiveFilters()">
+          Clear
+        </button>
+      </div>
+
+      <div class="filters__grid">
+        <div class="filters__field">
+          <label class="filters__label">Client</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Customer name"
+            [(ngModel)]="filters.client"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
+        <div class="filters__field">
+          <label class="filters__label">Supervisor</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Supervisor"
+            [(ngModel)]="filters.supervisor"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
+        <div class="filters__field">
+          <label class="filters__label">Employee</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Employee"
+            [(ngModel)]="filters.employee"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
+        <div class="filters__field">
+          <label class="filters__label">Date</label>
+          <input class="filters__input" type="date" [(ngModel)]="filters.date" (ngModelChange)="onFiltersChanged()" />
+        </div>
+        <div class="filters__field">
+          <label class="filters__label">Service</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Service"
+            [(ngModel)]="filters.service"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
+        <div class="filters__field">
+          <label class="filters__label">Place</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Address / city"
+            [(ngModel)]="filters.place"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
+      </div>
+    </section>
 
     <div class="state state--loading" *ngIf="isLoading">
       <div class="spinner" aria-label="Loading"></div>
@@ -57,53 +123,279 @@
       </div>
     </div>
 
-    <section class="bookings-list" *ngIf="!isLoading && !errorMessage && !isUnauthorized && !isForbidden && bookings.length">
-      <article class="booking-card" *ngFor="let b of bookings; trackBy: trackByBookingId">
-        <div class="booking-card__col booking-card__col--left">
-          <div class="customer">
-            <div class="customer__name">{{ b.name }}</div>
-            <div class="customer__email">{{ b.email }}</div>
+    <div class="state state--empty" *ngIf="!isLoading && !errorMessage && !isUnauthorized && !isForbidden && bookings.length && !filteredBookings.length">
+      <div class="empty-state">
+        <div class="empty-state__icon">🔎</div>
+        <div class="empty-state__title">No matches</div>
+        <div class="empty-state__subtitle">No bookings match the current filters.</div>
+        <div class="empty-state__actions">
+          <button type="button" class="btn btn--ghost" (click)="clearFilters()" [disabled]="!hasActiveFilters()">Clear filters</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="bookings-list" *ngIf="!isLoading && !errorMessage && !isUnauthorized && !isForbidden && filteredBookings.length">
+      <article class="booking-card" *ngFor="let b of filteredBookings; trackBy: trackByBookingId">
+        <div class="booking-card__header">
+          <div class="booking-card__header-left">
+            <div class="summary-grid">
+              <div class="summary-grid__left">
+                <div class="customer">
+                  <div class="customer__name">
+                    <span class="customer__name-label">Client:</span>
+                    <span class="customer__name-value">{{ b.name }}</span>
+                  </div>
+
+                  <div class="customer__field">
+                    <div class="customer__field-label">Email</div>
+                    <div class="customer__field-value">{{ b.email }}</div>
+                  </div>
+
+                  <div class="customer__field" *ngIf="b.phone || b.display?.customer?.phone">
+                    <div class="customer__field-label">Phone</div>
+                    <div class="customer__field-value">{{ b.phone || b.display?.customer?.phone }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-grid__right">
+                <div class="details details--stack">
+                  <div class="details__row details__row--stack">
+                    <span class="details__label">Service</span>
+                    <span class="details__value">{{ getServiceDisplay(b) }}</span>
+                  </div>
+                  <div class="details__row details__row--stack">
+                    <span class="details__label">Schedule</span>
+                    <span class="details__value">{{ b.desiredDate }} · {{ b.desiredTime }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-grid__address">
+                <div class="summary-grid__address-label">Address</div>
+                <div class="summary-grid__address-value">{{ b.address }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="booking-card__header-right">
+            <div class="header-actions">
+              <div class="status">
+                <span class="status-badge" [ngClass]="getStatusClass(b.status)">{{ getStatusLabel(b.status) }}</span>
+                <button type="button" class="btn btn--ghost btn--tiny" (click)="toggleDetails(b._id)">
+                  {{ isExpanded(b._id) ? 'Hide' : 'Details' }}
+                </button>
+              </div>
+
+              <details class="collapsible collapsible--header" *ngIf="isAdminOnly()">
+                <summary class="collapsible__summary">
+                  <span class="collapsible__title">Edit assignment</span>
+                  <span class="collapsible__meta" *ngIf="getSelectedEmployeesDisplay(b._id)">
+                    Selected: {{ getSelectedEmployeesDisplay(b._id) }}
+                  </span>
+                </summary>
+                <div class="collapsible__content">
+                  <div class="assign-row">
+                    <div class="assign-row__col">
+                      <div class="assign-row__label">Supervisor</div>
+                      <select
+                        class="assign-row__select"
+                        [(ngModel)]="selectedSupervisorByBookingId[b._id]"
+                        [disabled]="!canAssign(b) || isAssigning(b._id)"
+                        (change)="onSupervisorSelectionChanged(b._id)"
+                        (blur)="onSupervisorSelectionDone(b._id)"
+                      >
+                        <option value="">Select supervisor</option>
+                        <option
+                          *ngFor="let s of supervisorsForAssignment; trackBy: trackByEmployeeId"
+                          [value]="s.id"
+                          [disabled]="!s.isActive"
+                        >
+                          {{ s.isActive ? getEmployeeSelectLabel(s) : 'Inactive - ' + getEmployeeSelectLabel(s) }}
+                        </option>
+                      </select>
+                    </div>
+
+                    <div class="assign-row__col assign-row__col--employees">
+                      <div class="assign-row__label">Employees</div>
+                      <div class="assign-row__employees" (mouseenter)="onEmployeesSelectionChanged(b._id)">
+                        <label class="assign-row__employee" *ngFor="let e of employeesForAssignment; trackBy: trackByEmployeeId">
+                          <input
+                            type="checkbox"
+                            [checked]="(selectedEmployeesByBookingId[b._id] || []).includes(e.id)"
+                            [disabled]="!canAssign(b) || isAssigning(b._id) || !e.isActive"
+                            (change)="toggleEmployeeForBooking(b._id, e.id, $any($event.target).checked)"
+                          />
+                          <span>{{ getEmployeeSelectLabel(e) }}</span>
+                        </label>
+                      </div>
+                      <div class="assign-row__selected" *ngIf="getSelectedEmployeesDisplay(b._id)">
+                        Selected: {{ getSelectedEmployeesDisplay(b._id) }}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="btn btn--confirm"
+                      [disabled]="!canSubmitAssignment(b._id, b)"
+                      (click)="assignBooking(b._id)"
+                    >
+                      {{ isAssigning(b._id) ? 'Assigning…' : 'Assign' }}
+                    </button>
+                  </div>
+
+                  <div class="helper-text" *ngIf="getAssignmentHelperText(b)">{{ getAssignmentHelperText(b) }}</div>
+                  <div class="action-state" *ngIf="isAssigning(b._id) || isUpdating(b._id)">
+                    {{ isAssigning(b._id) ? 'Assigning…' : 'Saving…' }}
+                  </div>
+                </div>
+              </details>
+
+              <div class="banner banner--success banner--compact" *ngIf="assignmentSuccessMessageByBookingId[b._id]">
+                {{ assignmentSuccessMessageByBookingId[b._id] }}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="booking-card__col booking-card__col--center">
-          <div class="details">
-            <div class="details__row">
-              <span class="details__label">Service</span>
-              <span class="details__value">{{ b.cleaningType }}</span>
+        <div class="booking-card__divider"></div>
+
+        <div class="booking-card__assignment">
+          <div class="booking-card__assignment-left">
+            <div class="meta-strip">
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Supervisor</div>
+                <div class="meta-strip__v">{{ getSupervisorDisplay(b) }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Employees</div>
+                <div class="meta-strip__v">{{ getEmployeesDisplay(b) }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Assigned</div>
+                <div class="meta-strip__v">{{ getAssignedAt(b) || '-' }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Started</div>
+                <div class="meta-strip__v">{{ getStartedAt(b) || '-' }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Completed</div>
+                <div class="meta-strip__v">{{ getCompletedAt(b) || '-' }}</div>
+              </div>
             </div>
-            <div class="details__row">
-              <span class="details__label">Schedule</span>
-              <span class="details__value">{{ b.desiredDate }} · {{ b.desiredTime }}</span>
+          </div>
+
+          <div class="booking-card__assignment-right">
+            <div class="actions" *ngIf="isAdminOnly()">
+              <button
+                type="button"
+                class="btn btn--confirm"
+                (click)="updateStatus(b._id, 'confirmed')"
+                [disabled]="isUpdating(b._id) || !canConfirm(b)"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                class="btn btn--cancel"
+                (click)="updateStatus(b._id, 'cancelled')"
+                [disabled]="isUpdating(b._id) || !canCancel(b)"
+              >
+                Cancel
+              </button>
             </div>
-            <div class="details__row details__row--muted">
-              <span class="details__label">Address</span>
-              <span class="details__value">{{ b.address }}</span>
+            <div class="actions" *ngIf="isSupervisor()">
+              <button
+                type="button"
+                class="btn btn--confirm"
+                *ngIf="b.status === 'assigned'"
+                (click)="startJob(b._id)"
+                [disabled]="isJobActionLoading(b._id)"
+              >
+                Start Job
+              </button>
+              <button
+                type="button"
+                class="btn btn--confirm"
+                *ngIf="b.status === 'in_progress'"
+                (click)="completeJob(b._id)"
+                [disabled]="isJobActionLoading(b._id)"
+              >
+                Complete Job
+              </button>
             </div>
           </div>
         </div>
 
-        <div class="booking-card__col booking-card__col--right">
-          <div class="status">
-            <span class="status-badge" [ngClass]="getStatusClass(b.status)">{{ getStatusLabel(b.status) }}</span>
-          </div>
-          <div class="actions">
-            <button
-              type="button"
-              class="btn btn--confirm"
-              (click)="updateStatus(b._id, 'confirmed')"
-              [disabled]="isUpdating(b._id) || b.status === 'confirmed' || b.status === 'paid'"
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              class="btn btn--cancel"
-              (click)="updateStatus(b._id, 'cancelled')"
-              [disabled]="isUpdating(b._id) || b.status === 'cancelled' || b.status === 'paid'"
-            >
-              Cancel
-            </button>
+        <div class="booking-card__details" *ngIf="isExpanded(b._id)">
+          <div class="detail-grid">
+            <div class="detail-section">
+              <div class="detail-section__title">Booking Info</div>
+              <div class="kv">
+                <div class="kv__row"><span class="kv__k">Service</span><span class="kv__v">{{ getServiceDisplay(b) }}</span></div>
+                <div class="kv__row"><span class="kv__k">Date</span><span class="kv__v">{{ b.desiredDate }}</span></div>
+                <div class="kv__row"><span class="kv__k">Time</span><span class="kv__v">{{ b.desiredTime }}</span></div>
+                <div class="kv__row"><span class="kv__k">Frequency</span><span class="kv__v">{{ getFrequencyDisplay(b) }}</span></div>
+              </div>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section__title">Property</div>
+              <div class="kv" *ngIf="getPropertyDetails(b).length; else noPropertyDetails">
+                <div class="kv__row" *ngFor="let row of getPropertyDetails(b)">
+                  <span class="kv__k">{{ row.label }}</span>
+                  <span class="kv__v">{{ row.value }}</span>
+                </div>
+              </div>
+              <ng-template #noPropertyDetails>
+                <div class="detail-muted">No property details.</div>
+              </ng-template>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section__title">Extras</div>
+              <div class="chips" *ngIf="getExtrasItems(b).length; else noExtras">
+                <span class="chip" *ngFor="let x of getExtrasItems(b)">
+                  {{ x.label }}<ng-container *ngIf="x.quantity && x.quantity > 1"> × {{ x.quantity }}</ng-container>
+                </span>
+              </div>
+              <ng-template #noExtras>
+                <div class="detail-muted">No extras selected.</div>
+              </ng-template>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section__title">Customer Notes</div>
+              <div class="note-box" *ngIf="getCustomerNotes(b); else noCustomerNotes">{{ getCustomerNotes(b) }}</div>
+              <ng-template #noCustomerNotes>
+                <div class="detail-muted">No notes provided.</div>
+              </ng-template>
+            </div>
+
+            <div class="detail-section">
+              <div class="detail-section__title">Special Conditions</div>
+              <div class="chips" *ngIf="getSpecialConditions(b).length; else noConditions">
+                <span class="chip chip--muted" *ngFor="let x of getSpecialConditions(b)">{{ x }}</span>
+              </div>
+              <ng-template #noConditions>
+                <div class="detail-muted">No special conditions.</div>
+              </ng-template>
+            </div>
+
+            <div class="detail-section detail-section--full">
+              <div class="detail-section__title">Pricing</div>
+              <div class="price-table">
+                <div class="price-row" *ngFor="let row of getPricingItems(b)">
+                  <span class="price-row__label">{{ row.label }}</span>
+                  <span class="price-row__amount">{{ row.amount | currency:'USD':'symbol':'1.2-2' }}</span>
+                </div>
+                <div class="price-total" *ngIf="getPricingTotal(b) !== null">
+                  <span class="price-total__label">Total</span>
+                  <span class="price-total__amount">{{ getPricingTotal(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </article>

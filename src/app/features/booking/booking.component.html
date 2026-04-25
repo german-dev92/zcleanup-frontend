@@ -9,13 +9,15 @@
       <p>{{ submitMessage }}</p>
       <p *ngIf="isRefreshingBookingStatus">Refreshing booking status...</p>
       <p *ngIf="isWaitingForConfirmation">Waiting for admin confirmation.</p>
-      <p *ngIf="paymentUiState === 'PENDING_PAYMENT'">Payment pending confirmation.</p>
-      <p *ngIf="paymentUiState === 'PAYMENT_CONFIRMED'">Payment confirmed.</p>
-      <p *ngIf="paymentUiState === 'PAYMENT_FAILED'">Payment failed.</p>
-      <p *ngIf="paymentStatusHint">{{ paymentStatusHint }}</p>
+      <ng-container *ngIf="!isAdminManualBooking">
+        <p *ngIf="paymentUiState === 'PENDING_PAYMENT'">Payment pending confirmation.</p>
+        <p *ngIf="paymentUiState === 'PAYMENT_CONFIRMED'">Payment confirmed.</p>
+        <p *ngIf="paymentUiState === 'PAYMENT_FAILED'">Payment failed.</p>
+        <p *ngIf="paymentStatusHint">{{ paymentStatusHint }}</p>
+      </ng-container>
       <p *ngIf="submittedBookingStatus">{{ getStatusLabel(submittedBookingStatus) }}</p>
       <app-button
-        *ngIf="submittedBookingStatus === 'confirmed'"
+        *ngIf="submittedBookingStatus === 'confirmed' && !isAdminManualBooking"
         type="button"
         variant="accent"
         size="small"

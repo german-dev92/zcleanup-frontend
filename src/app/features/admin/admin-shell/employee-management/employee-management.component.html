@@ -1,0 +1,127 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div class="page-header__text">
+      <h1 class="page-header__title">Employee Management</h1>
+      <p class="page-header__subtitle">Create and manage employees</p>
+    </div>
+    <div class="page-header__meta">
+      <button type="button" class="btn btn--confirm" (click)="openCreateModal()">Create Employee</button>
+    </div>
+  </header>
+
+  <div class="state state--error" *ngIf="errorMessage">
+    <div class="state-card">
+      <div class="state-card__icon">!</div>
+      <div class="state-card__text">
+        <div class="state-card__title">Employee management</div>
+        <div class="state-card__subtitle">{{ errorMessage }}</div>
+      </div>
+      <div class="state-card__actions">
+        <button type="button" class="btn btn--ghost" (click)="loadEmployees()">Retry</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="state state--loading" *ngIf="isLoading">
+    <div class="spinner" aria-label="Loading"></div>
+  </div>
+
+  <div class="table-wrap" *ngIf="!isLoading && !errorMessage">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th class="table__actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let e of employees; trackBy: trackByEmployeeId">
+          <td>{{ e.name || '-' }}</td>
+          <td>{{ e.email }}</td>
+          <td>{{ e.phone || '-' }}</td>
+          <td>{{ e.role || '-' }}</td>
+          <td>
+            <span [class.status-pill--inactive]="!e.isActive" class="status-pill">
+              {{ e.isActive ? 'Active' : 'Inactive' }}
+            </span>
+          </td>
+          <td class="table__actions">
+            <button type="button" class="btn btn--ghost" (click)="openEditModal(e)" [disabled]="isSaving">Edit</button>
+            <button type="button" class="btn btn--ghost" (click)="deleteEmployee(e.id)" [disabled]="isSaving">Delete</button>
+            <button
+              type="button"
+              class="btn btn--cancel"
+              *ngIf="e.isActive"
+              (click)="setActive(e.id, false)"
+            >
+              Deactivate
+            </button>
+            <button
+              type="button"
+              class="btn btn--confirm"
+              *ngIf="!e.isActive"
+              (click)="setActive(e.id, true)"
+            >
+              Activate
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="employees.length === 0">
+          <td colspan="6" class="table__empty">No employees found.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal" *ngIf="isModalOpen">
+    <div class="modal__backdrop" (click)="closeModal()"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Employee">
+      <div class="modal__header">
+        <div class="modal__title">{{ editingEmployee ? 'Edit Employee' : 'Create Employee' }}</div>
+        <button type="button" class="btn btn--ghost" (click)="closeModal()">Close</button>
+      </div>
+
+      <div class="modal__error" *ngIf="modalErrorMessage">{{ modalErrorMessage }}</div>
+
+      <form [formGroup]="form" (ngSubmit)="submitModal()" class="form">
+        <label class="form__label">
+          Name
+          <input class="form__input" type="text" formControlName="name" />
+        </label>
+
+        <label class="form__label">
+          Email
+          <input class="form__input" type="email" formControlName="email" />
+        </label>
+
+        <label class="form__label" *ngIf="!editingEmployee">
+          Password
+          <input class="form__input" type="password" formControlName="password" />
+        </label>
+
+        <label class="form__label">
+          Phone (optional)
+          <input class="form__input" type="tel" formControlName="phone" />
+        </label>
+
+        <label class="form__label">
+          Role
+          <select class="form__input" formControlName="role">
+            <option *ngFor="let r of roleOptions" [value]="r.value">{{ r.label }}</option>
+          </select>
+        </label>
+
+        <div class="form__actions">
+          <button type="button" class="btn btn--ghost" (click)="closeModal()" [disabled]="isSaving">Cancel</button>
+          <button type="submit" class="btn btn--confirm" [disabled]="isSaving || form.invalid">
+            {{ isSaving ? (editingEmployee ? 'Saving...' : 'Creating...') : (editingEmployee ? 'Save' : 'Create') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

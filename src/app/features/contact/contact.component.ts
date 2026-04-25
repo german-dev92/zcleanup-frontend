@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ContactService } from '../../core/services/contact.service';
 import { GeolocationService } from '../../core/services/geolocation.service';
@@ -11,11 +11,15 @@ import { noControlChars, noHtmlLikeInput, trimmedMinLength } from '../../shared/
   templateUrl: './contact.component.html',
   styleUrls: ['./contact.component.scss']
 })
-export class ContactComponent implements OnInit {
+export class ContactComponent implements OnInit, OnDestroy {
   contactForm!: FormGroup;
   isSubmitting = false;
   submitSuccess = false;
   submitMessage = '';
+  isGoogleMapsReady = false;
+  isLocalhost = false;
+  mapsApiKeyDraft = '';
+  private googleMapsCheckTimer: number | null = null;
 
   // Map options
   mapCenter: google.maps.LatLngLiteral = { lat: 27.9506, lng: -82.4572 }; // Tampa center
@@ -43,8 +47,49 @@ export class ContactComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1');
     this.initForm();
     this.initMapData();
+    this.startGoogleMapsDetection();
+  }
+
+  ngOnDestroy(): void {
+    if (this.googleMapsCheckTimer !== null) {
+      window.clearInterval(this.googleMapsCheckTimer);
+      this.googleMapsCheckTimer = null;
+    }
+  }
+
+  private startGoogleMapsDetection(): void {
+    const isReady = () => !!(window as any)?.google?.maps;
+    this.isGoogleMapsReady = isReady();
+    if (this.isGoogleMapsReady) return;
+
+    let tries = 0;
+    this.googleMapsCheckTimer = window.setInterval(() => {
+      tries += 1;
+      this.isGoogleMapsReady = isReady();
+      if (this.isGoogleMapsReady || tries >= 40) {
+        if (this.googleMapsCheckTimer !== null) {
+          window.clearInterval(this.googleMapsCheckTimer);
+          this.googleMapsCheckTimer = null;
+        }
+      }
+    }, 250);
+  }
+
+  enableGoogleMaps(): void {
+    const key = String(this.mapsApiKeyDraft ?? '').trim();
+    if (!key) return;
+    try {
+      localStorage.setItem('ZC_GOOGLE_MAPS_API_KEY', key);
+      window.location.reload();
+    } catch {
+      return;
+    }
   }
 
   initMapData(): void {

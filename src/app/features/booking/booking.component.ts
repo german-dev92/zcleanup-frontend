@@ -6,11 +6,12 @@ import { catchError, debounceTime, distinctUntilChanged, map, switchMap, takeUnt
 import { HttpErrorResponse } from '@angular/common/http';
 import { BookingService } from '../../core/services/booking.service';
 import { ServiceDataService } from '../../core/services/service-data.service';
-import { APARTMENT_PACKAGES, DEEP_PACKAGES, EXTRAS_CATALOG, EXTRA_ALIASES, ExtraCatalogItem, MOVE_IN_PACKAGES, MOVE_OUT_PACKAGES, PricingService, STANDARD_PACKAGES } from '../../core/services/pricing.service';
+import { APARTMENT_PACKAGES, DEEP_PACKAGES, EXTRAS_CATALOG, EXTRA_ALIASES, ExtraCatalogItem, MOVE_IN_PACKAGES, MOVE_OUT_PACKAGES, STANDARD_PACKAGES } from '../../core/services/pricing.service';
 import { CleaningService } from '../../core/models/service.model';
 import { LocationResult } from '../../core/models/location.model';
 import { SafeLoggerService } from '../../core/services/safe-logger.service';
-import { sanitizeAddress, sanitizeEmail, sanitizeMultiline, sanitizeObjectDeep, sanitizeText } from '../../shared/security/input-sanitizer';
+import { AuthService } from '../../core/services/auth.service';
+import { sanitizeAddress, sanitizeEmail, sanitizeText } from '../../shared/security/input-sanitizer';
 import { noControlChars, noHtmlLikeInput, trimmedMinLength } from '../../shared/security/security-validators';
 
 import { GeolocationService } from '../../core/services/geolocation.service';
@@ -31,6 +32,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   submittedBookingId: string | null = null;
   isWaitingForConfirmation = false;
   isRefreshingBookingStatus = false;
+  isAdminManualBooking = false;
   isPaymentReturnContext = false;
   isPaymentCancelContext = false;
   paymentStatusHint = '';
@@ -67,6 +69,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   private discountCheckRequestId = 0;
   private lastCheckedDiscountEmail = '';
   private currentLocationRequestId = 0;
+  private currentPricePreviewRequestId = 0;
   private lastStatusRefreshBookingId: string | null = null;
   private readonly bookingIdStorageKey = 'zcleanup_last_booking_id';
   private readonly paymentPollStop$ = new Subject<void>();
@@ -105,14 +108,15 @@ export class BookingComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private bookingService: BookingService,
     private serviceData: ServiceDataService,
-    private pricingService: PricingService,
     private geolocationService: GeolocationService,
+    private auth: AuthService,
     private route: ActivatedRoute,
     private router: Router,
     private logger: SafeLoggerService
   ) {}
 
   ngOnInit(): void {
+    this.isAdminManualBooking = this.getAncestorRouteDataFlag('isAdminManualBooking');
     const std = this.serviceData.getServiceBySlug('standard-cleaning') || null;
     this.availableServices = this.serviceData.getEnabledServices();
     this.coverageCitiesList = this.geolocationService.getCoverageCities();
@@ -682,29 +686,108 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     const applyDiscount = !!this.bookingForm.get('applyFirstDiscount')?.value;
 
-    const formValue = {
-      ...(this.bookingForm.get('dynamicFields') as FormGroup | null)?.getRawValue(),
+    const cleaningType = this.selectedService.slug;
+    const dynamicFieldsRaw =
+      (this.bookingForm.get('dynamicFields') as FormGroup | null)?.getRawValue() ?? {};
+
+    const rawExtras: unknown[] = Array.isArray(this.bookingForm.get('extras')?.value)
+      ? (this.bookingForm.get('extras')?.value as unknown[])
+      : [];
+    const normalizedExtras = Array.from(
+      new Set(
+        rawExtras
+          .map((x) => String(x ?? '').trim())
+          .filter(Boolean)
+          .map((x) => String(EXTRA_ALIASES[x] ?? x))
+      )
+    );
+
+    const sanitizedDynamicFields: any = this.sanitizeDynamicFields(
+      cleaningType,
+      dynamicFieldsRaw,
+      normalizedExtras
+    );
+
+    const windowsQuantity = this.toInt(dynamicFieldsRaw?.windowsQuantity, 1, 5000, 1);
+    const laundryLoads = this.toInt(dynamicFieldsRaw?.laundryLoads, 1, 2, 1);
+
+    const extrasPayload: any[] = normalizedExtras
+      .map((e) => {
+        const id = String(e ?? '').trim();
+        if (!id) return null;
+        if (id === 'windows_exterior') return { type: 'outside_windows', quantity: windowsQuantity };
+        if (id === 'laundry') return { type: 'laundry', quantity: laundryLoads };
+        if (id === 'heavy_buildup') return 'heavy';
+        if (id === 'organize_clothes') return 'organize';
+        return id;
+      })
+      .filter((x) => x !== null);
+
+    const payload: any = {
+      cleaningType,
+      address: this.bookingForm.get('address')?.value,
       frequency: this.bookingForm.get('frequency')?.value,
-      extras: this.bookingForm.get('extras')?.value,
-      applyDiscount
+      extras: extrasPayload,
+      petsAtHome: !!this.bookingForm.get('petsAtHome')?.value,
+      distanceSurcharge: !!this.isExtraCharge,
+      applyFirstDiscount: applyDiscount,
+      dynamicFields: sanitizedDynamicFields
     };
 
-    const breakdown = this.pricingService.calculateBreakdown(this.selectedService, formValue, this.isExtraCharge);
-    if (breakdown === 'custom') {
-      this.basePrice = 0;
-      this.extrasPrice = 0;
-      this.borderlineFee = 0;
-      this.firstServiceDiscount = 0;
-      this.finalPrice = 0;
-      return;
+    if (typeof sanitizedDynamicFields?.bedrooms === 'number') payload.bedrooms = sanitizedDynamicFields.bedrooms;
+    if (typeof sanitizedDynamicFields?.bathrooms === 'number') payload.bathrooms = sanitizedDynamicFields.bathrooms;
+    if (typeof sanitizedDynamicFields?.additionalBedrooms === 'number') {
+      payload.additionalBedrooms = sanitizedDynamicFields.additionalBedrooms;
+    }
+    if (typeof sanitizedDynamicFields?.moveMode === 'string') payload.moveMode = sanitizedDynamicFields.moveMode;
+    if (sanitizedDynamicFields?.postConstruction && typeof sanitizedDynamicFields.postConstruction === 'object') {
+      payload.postConstruction = sanitizedDynamicFields.postConstruction;
+    }
+    if (sanitizedDynamicFields?.windowCleaning && typeof sanitizedDynamicFields.windowCleaning === 'object') {
+      payload.windowCleaning = sanitizedDynamicFields.windowCleaning;
     }
 
-    this.basePrice = breakdown.basePrice;
-    this.extrasPrice = breakdown.extrasPrice;
-    this.borderlineFee = breakdown.borderlineFee;
-    this.firstServiceDiscount = breakdown.discount;
-    this.finalPrice = breakdown.finalPrice;
-    this.estimatedPrice = Math.round(this.basePrice + this.borderlineFee);
+    const requestId = ++this.currentPricePreviewRequestId;
+    this.bookingService.pricePreview(payload).subscribe({
+      next: (res) => {
+        if (requestId !== this.currentPricePreviewRequestId) return;
+        const estimatedPrice = Number(res?.estimatedPrice);
+        const finalPricePreview = Number(res?.finalPricePreview);
+        const discountAmount = Number(res?.discountAmount);
+        const extrasTotal = Number(res?.extrasTotal);
+        const petsFee = Number(res?.petsFee);
+        const distanceFee = Number(res?.distanceFee);
+
+        if (!Number.isFinite(estimatedPrice) || !Number.isFinite(finalPricePreview)) {
+          this.basePrice = 0;
+          this.extrasPrice = 0;
+          this.borderlineFee = 0;
+          this.firstServiceDiscount = 0;
+          this.finalPrice = 0;
+          this.estimatedPrice = 0;
+          return;
+        }
+
+        this.basePrice = estimatedPrice;
+        this.extrasPrice =
+          Number.isFinite(extrasTotal) && Number.isFinite(petsFee)
+            ? extrasTotal + petsFee
+            : 0;
+        this.borderlineFee = Number.isFinite(distanceFee) ? distanceFee : 0;
+        this.firstServiceDiscount = Number.isFinite(discountAmount) ? discountAmount : 0;
+        this.finalPrice = finalPricePreview;
+        this.estimatedPrice = Math.round(this.basePrice + this.borderlineFee);
+      },
+      error: () => {
+        if (requestId !== this.currentPricePreviewRequestId) return;
+        this.basePrice = 0;
+        this.extrasPrice = 0;
+        this.borderlineFee = 0;
+        this.firstServiceDiscount = 0;
+        this.finalPrice = 0;
+        this.estimatedPrice = 0;
+      }
+    });
   }
 
   checkQueryParams(): void {
@@ -729,9 +812,17 @@ export class BookingComponent implements OnInit, OnDestroy {
         const isPaymentSuccess = String(this.router.url ?? '').includes('/payment/success');
         const isPaymentContextFromPath = isPaymentCancel || isPaymentSuccess;
 
-        const storedBookingId = !bookingIdParam ? String(sessionStorage.getItem(this.bookingIdStorageKey) ?? '').trim() : '';
+        const canSyncBookingStatus =
+          this.isAdminManualBooking ||
+          (this.auth.hasValidToken() && this.auth.isAdminOrSupervisor());
+
+        const storedBookingId =
+          canSyncBookingStatus && !bookingIdParam
+            ? String(sessionStorage.getItem(this.bookingIdStorageKey) ?? '').trim()
+            : '';
         const effectiveBookingId = bookingIdParam || storedBookingId;
-        if (effectiveBookingId && effectiveBookingId !== this.lastStatusRefreshBookingId) {
+
+        if (canSyncBookingStatus && effectiveBookingId && effectiveBookingId !== this.lastStatusRefreshBookingId) {
           this.refreshBookingStatus(effectiveBookingId, isPaymentReturn || isPaymentContextFromPath, isPaymentCancel);
         } else if (!effectiveBookingId && (isPaymentReturn || isPaymentContextFromPath)) {
           this.isPaymentReturnContext = true;
@@ -918,6 +1009,16 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.submitBooking();
   }
 
+  private getAncestorRouteDataFlag(key: string): boolean {
+    let current: ActivatedRoute | null = this.route;
+    while (current) {
+      const value = (current.snapshot?.data as any)?.[key];
+      if (value === true) return true;
+      current = current.parent;
+    }
+    return false;
+  }
+
   private submitBooking(): void {
     const discountControl = this.discountControl;
 
@@ -927,6 +1028,7 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     this.isSubmitting = true;
     const bookingData = this.buildSanitizedBookingData();
+    console.log('[SANITIZED BOOKING PAYLOAD]', bookingData);
 
     this.bookingService.bookService(bookingData).subscribe({
       next: (response) => {
@@ -964,6 +1066,9 @@ export class BookingComponent implements OnInit, OnDestroy {
         const statusMessage = this.getUserFriendlyStatusMessage(bookingStatus);
         this.submitMessage = [statusMessage, discountFeedback].filter(Boolean).join(' ');
         if (response.success) {
+          if (this.isAdminManualBooking) {
+            this.submitMessage = 'Booking created manually. No payment required yet.';
+          }
           this.bookingForm.reset({
             frequency: 'one-time',
             petsAtHome: false,
@@ -1064,26 +1169,183 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   private buildSanitizedBookingData(): any {
     const raw = this.bookingForm.getRawValue();
+    return this.sanitizeBookingPayload(raw);
+  }
 
-    const base = {
-      ...raw,
+  private sanitizeBookingPayload(raw: any): any {
+    const cleaningType = sanitizeText(raw?.cleaningType, { maxLength: 60 });
+
+    const rawExtras: unknown[] = Array.isArray(raw?.extras) ? raw.extras : [];
+    const normalizedExtras = Array.from(
+      new Set(
+        rawExtras
+          .map((x) => String(x ?? '').trim())
+          .filter(Boolean)
+          .map((x) => String(EXTRA_ALIASES[x] ?? x))
+      )
+    );
+
+    const phone = sanitizeText(raw?.phone, { maxLength: 20 });
+    const frequency = sanitizeText(raw?.frequency, { maxLength: 40 }) || 'one-time';
+
+    const df = raw?.dynamicFields && typeof raw.dynamicFields === 'object' ? raw.dynamicFields : {};
+    const dynamicFields: any = this.sanitizeDynamicFields(cleaningType, df, normalizedExtras);
+
+    const windowsQuantity = this.toInt(df?.windowsQuantity, 1, 5000, 1);
+    const laundryLoads = this.toInt(df?.laundryLoads, 1, 2, 1);
+
+    const extrasPayload: any[] = normalizedExtras.map((e) => {
+      const id = String(e ?? '').trim();
+      if (!id) return null;
+
+      if (id === 'windows_exterior') {
+        return { type: 'outside_windows', quantity: windowsQuantity };
+      }
+      if (id === 'laundry') {
+        return { type: 'laundry', quantity: laundryLoads };
+      }
+      if (id === 'heavy_buildup') return 'heavy';
+      if (id === 'organize_clothes') return 'organize';
+
+      return id;
+    }).filter((x) => x !== null);
+
+    const payload: any = {
       name: sanitizeText(raw?.name, { maxLength: 60 }),
       email: sanitizeEmail(raw?.email, { maxLength: 254 }),
-      phone: sanitizeText(raw?.phone, { maxLength: 20 }),
       address: sanitizeAddress(raw?.address, { maxLength: 160 }),
-      estimatedPrice: this.estimatedPrice,
-      finalPricePreview: this.finalPrice
+      cleaningType,
+      desiredDate: sanitizeText(raw?.desiredDate, { maxLength: 20 }),
+      desiredTime: sanitizeText(raw?.desiredTime, { maxLength: 10 }),
+      petsAtHome: !!raw?.petsAtHome,
+      useOwnProducts: !!raw?.useOwnProducts,
+      applyFirstDiscount: !!raw?.applyFirstDiscount,
+      frequency,
+      extras: extrasPayload,
+      dynamicFields
     };
 
-    if (base?.dynamicFields && typeof base.dynamicFields === 'object') {
-      base.dynamicFields = sanitizeObjectDeep(base.dynamicFields, (s) => sanitizeText(s, { maxLength: 200 }));
+    if (phone) {
+      payload.phone = phone;
     }
 
-    if (typeof base?.message === 'string') {
-      base.message = sanitizeMultiline(base.message, { maxLength: 1500 });
+    if (dynamicFields && typeof dynamicFields === 'object') {
+      if (typeof dynamicFields.bedrooms === 'number') payload.bedrooms = dynamicFields.bedrooms;
+      if (typeof dynamicFields.bathrooms === 'number') payload.bathrooms = dynamicFields.bathrooms;
+      if (typeof dynamicFields.additionalBedrooms === 'number') {
+        payload.additionalBedrooms = dynamicFields.additionalBedrooms;
+      }
+      if (typeof dynamicFields.moveMode === 'string') payload.moveMode = dynamicFields.moveMode;
+      if (dynamicFields.postConstruction && typeof dynamicFields.postConstruction === 'object') {
+        payload.postConstruction = dynamicFields.postConstruction;
+      }
+      if (dynamicFields.windowCleaning && typeof dynamicFields.windowCleaning === 'object') {
+        payload.windowCleaning = dynamicFields.windowCleaning;
+      }
     }
 
-    return base;
+    return payload;
+  }
+
+  private sanitizeDynamicFields(cleaningType: string, df: any, extras: string[]): any {
+    const out: any = {};
+
+    if (cleaningType === 'standard-cleaning') {
+      const pkgId = sanitizeText(df?.stdPackage ?? '1-1', { maxLength: 20 });
+      const pkg = this.standardPackages.find((p) => p.id === pkgId) || this.standardPackages[0];
+      const extraBedrooms = this.toInt(df?.extraBedrooms, 0, 10, 0);
+      out.stdPackage = pkgId;
+      out.extraBedrooms = extraBedrooms;
+      out.bedrooms = this.toInt(pkg?.bedrooms, 1, 14, 1);
+      out.bathrooms = this.toInt(pkg?.bathrooms, 1, 10, 1);
+      out.additionalBedrooms = extraBedrooms;
+    } else if (cleaningType === 'apartment-cleaning') {
+      const pkgId = sanitizeText(df?.aptPackage ?? '1-1', { maxLength: 20 });
+      const pkg = this.apartmentPackages.find((p) => p.id === pkgId) || this.apartmentPackages[0];
+      const extraBedrooms = this.toInt(df?.aptExtraBedrooms, 0, 10, 0);
+      out.aptPackage = pkgId;
+      out.aptExtraBedrooms = extraBedrooms;
+      out.bedrooms = this.toInt(pkg?.bedrooms, 1, 14, 1);
+      out.bathrooms = this.toInt(pkg?.bathrooms, 1, 10, 1);
+      out.additionalBedrooms = extraBedrooms;
+    } else if (cleaningType === 'deep-cleaning') {
+      const pkgId = sanitizeText(df?.deepPackage ?? '1-1', { maxLength: 20 });
+      const pkg = this.deepPackages.find((p) => p.id === pkgId) || this.deepPackages[0];
+      const extraBedrooms = this.toInt(df?.deepExtraBedrooms, 0, 10, 0);
+      out.deepPackage = pkgId;
+      out.deepExtraBedrooms = extraBedrooms;
+      out.bedrooms = this.toInt(pkg?.bedrooms, 1, 14, 1);
+      out.bathrooms = this.toInt(pkg?.bathrooms, 1, 10, 1);
+      out.additionalBedrooms = extraBedrooms;
+    } else if (cleaningType === 'move-in-move-out') {
+      const moveMode = String(df?.moveMode ?? '').trim();
+      out.moveMode = moveMode === 'move_in' || moveMode === 'both' || moveMode === 'move_out' ? moveMode : 'move_out';
+
+      let bedrooms = 1;
+      let bathrooms = 1;
+      let additionalBedrooms = 0;
+
+      if (out.moveMode === 'move_out' || out.moveMode === 'both') {
+        const pkgId = sanitizeText(df?.moPackage ?? '1-1', { maxLength: 20 });
+        const pkg = this.moveOutPackages.find((p) => p.id === pkgId) || this.moveOutPackages[0];
+        const extra = this.toInt(df?.moveOutExtraBedrooms, 0, 10, 0);
+        out.moPackage = pkgId;
+        out.moveOutExtraBedrooms = extra;
+        bedrooms = this.toInt(pkg?.bedrooms, 1, 14, 1);
+        bathrooms = this.toInt(pkg?.bathrooms, 1, 10, 1);
+        additionalBedrooms = extra;
+      }
+
+      if (out.moveMode === 'move_in' || out.moveMode === 'both') {
+        const pkgId = sanitizeText(df?.miPackage ?? '1-1', { maxLength: 20 });
+        const pkg = this.moveInPackages.find((p) => p.id === pkgId) || this.moveInPackages[0];
+        const extra = this.toInt(df?.moveInExtraBedrooms, 0, 10, 0);
+        out.miPackage = pkgId;
+        out.moveInExtraBedrooms = extra;
+        const inBedrooms = this.toInt(pkg?.bedrooms, 1, 14, 1);
+        const inBathrooms = this.toInt(pkg?.bathrooms, 1, 10, 1);
+        if (out.moveMode === 'move_in') {
+          bedrooms = inBedrooms;
+          bathrooms = inBathrooms;
+          additionalBedrooms = extra;
+        } else {
+          bedrooms = Math.max(bedrooms, inBedrooms);
+          bathrooms = Math.max(bathrooms, inBathrooms);
+          additionalBedrooms = Math.max(additionalBedrooms, extra);
+        }
+      }
+
+      out.bedrooms = bedrooms;
+      out.bathrooms = bathrooms;
+      out.additionalBedrooms = additionalBedrooms;
+    } else if (cleaningType === 'post-construction-cleaning') {
+      const hours = this.toInt(df?.hours, 1, 200, 1);
+      const cleaners = this.toInt(df?.cleaners, 1, 50, 1);
+      out.hours = hours;
+      out.cleaners = cleaners;
+      out.postConstruction = { hours, cleaners };
+    } else if (cleaningType === 'window-cleaning') {
+      const windowCount = this.toInt(df?.units, 1, 5000, 1);
+      out.units = windowCount;
+      out.windowCleaning = { windowCount };
+    }
+
+    if (extras.includes('windows_exterior')) {
+      out.windowsQuantity = this.toInt(df?.windowsQuantity, 1, 5000, 1);
+    }
+
+    if (extras.includes('laundry')) {
+      out.laundryLoads = this.toInt(df?.laundryLoads, 1, 2, 1);
+    }
+
+    return out;
+  }
+
+  private toInt(value: unknown, min: number, max: number, fallback: number): number {
+    const n = typeof value === 'number' ? value : Number(String(value ?? '').trim());
+    if (!Number.isFinite(n)) return fallback;
+    const i = Math.trunc(n);
+    return Math.max(min, Math.min(max, i));
   }
 
   private syncFormControlDisabledStates(): void {

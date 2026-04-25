@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
 import { CoverageCity, LocationResult } from '../models/location.model';
 import { environment } from '../../../environments/environment';
 
@@ -9,9 +7,6 @@ import { environment } from '../../../environments/environment';
   providedIn: 'root'
 })
 export class GeolocationService {
-  private readonly GOOGLE_API_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
-  private readonly API_KEY = environment.googleMapsApiKey;
-
   // Coordinates for the center of covered cities in FL
   private coverageArea: CoverageCity[] = [
     { name: 'Tampa', lat: 27.9506, lng: -82.4572, radiusKm: 22 },
@@ -26,7 +21,7 @@ export class GeolocationService {
     { name: 'Oldsmar', lat: 28.0486, lng: -82.6697, radiusKm: 9 }
   ];
 
-  constructor(private http: HttpClient) {}
+  constructor() {}
 
   /**
    * Checks if a given coordinate is within the coverage area.
@@ -73,72 +68,89 @@ export class GeolocationService {
    */
   geocodeAddress(address: string): Observable<LocationResult | null> {
     if (!address || address.trim().length < 5) return of(null);
+    const googleMaps = (window as any)?.google?.maps;
+    if (googleMaps?.Geocoder) {
+      return new Observable<LocationResult | null>((subscriber) => {
+        const geocoder = new googleMaps.Geocoder();
+        const input = `${address}, FL, USA`;
+        geocoder.geocode({ address: input }, (results: any[], status: string) => {
+          try {
+            if (status === 'OK' && Array.isArray(results) && results.length > 0) {
+              const result = results[0];
+              const comps: any[] = Array.isArray(result?.address_components)
+                ? result.address_components
+                : [];
+              const isInFlorida = comps.some((comp: any) =>
+                comp?.short_name === 'FL' || comp?.long_name === 'Florida'
+              );
+              if (!isInFlorida) {
+                subscriber.next(null);
+                subscriber.complete();
+                return;
+              }
 
-    // Filter to ensure we are searching in Florida
-    const encodedAddress = encodeURIComponent(`${address}, FL, USA`);
-    const url = `${this.GOOGLE_API_URL}?address=${encodedAddress}&key=${this.API_KEY}`;
+              const location = result?.geometry?.location;
+              const lat =
+                typeof location?.lat === 'function' ? location.lat() : location?.lat;
+              const lng =
+                typeof location?.lng === 'function' ? location.lng() : location?.lng;
 
-    return this.http.get<any>(url).pipe(
-      map(response => {
-        if (response.status === 'OK' && response.results && response.results.length > 0) {
-          const result = response.results[0];
-          
-          // Verify it's actually in Florida to avoid false positives from other states
-          const isInFlorida = result.address_components.some((comp: any) => 
-            comp.short_name === 'FL' || comp.long_name === 'Florida'
-          );
+              if (typeof lat !== 'number' || typeof lng !== 'number') {
+                subscriber.next(null);
+                subscriber.complete();
+                return;
+              }
 
-          if (!isInFlorida) {
-            if (!environment.production) {
-              console.warn('Address found but not in Florida:', result.formatted_address);
+              subscriber.next({
+                lat,
+                lng,
+                address: String(result?.formatted_address ?? input),
+              });
+              subscriber.complete();
+              return;
             }
-            return null;
-          }
 
-          const location = result.geometry.location;
-          return {
-            lat: location.lat,
-            lng: location.lng,
-            address: result.formatted_address
-          };
-        }
-        
-        if (response.status === 'ZERO_RESULTS') {
-          if (!environment.production) {
-            console.warn('No results found for address:', address);
+            if (!environment.production && status && status !== 'OK') {
+              console.warn('Google Geocoder error:', status);
+            }
+            subscriber.next(null);
+            subscriber.complete();
+          } catch (e) {
+            subscriber.next(null);
+            subscriber.complete();
           }
-        } else if (response.status !== 'OK') {
-          if (!environment.production) {
-            console.error('Google Maps API error:', response.status, response.error_message);
-          }
-        }
-        
-        return null;
-      }),
-      catchError(error => {
-        if (!environment.production) {
-          console.error('Geocoding HTTP error:', error);
-        }
-        return of(null);
-      })
-    );
+        });
+      });
+    }
+
+    return of(null);
   }
 
   /**
    * Reverse geocodes coordinates to a formatted address
    */
   reverseGeocode(lat: number, lng: number): Observable<string | null> {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${this.API_KEY}`;
-    
-    return this.http.get<any>(url).pipe(
-      map(response => {
-        if (response.status === 'OK' && response.results && response.results.length > 0) {
-          return response.results[0].formatted_address;
+    const googleMaps = (window as any)?.google?.maps;
+    if (!googleMaps?.Geocoder) return of(null);
+
+    return new Observable<string | null>((subscriber) => {
+      const geocoder = new googleMaps.Geocoder();
+      const location = { lat, lng };
+      geocoder.geocode({ location }, (results: any[], status: string) => {
+        try {
+          if (status === 'OK' && Array.isArray(results) && results.length > 0) {
+            subscriber.next(String(results[0]?.formatted_address ?? ''));
+            subscriber.complete();
+            return;
+          }
+          subscriber.next(null);
+          subscriber.complete();
+        } catch {
+          subscriber.next(null);
+          subscriber.complete();
         }
-        return null;
-      }),
-      catchError(() => of(null))
-    );
+      });
+    });
   }
 
   /**

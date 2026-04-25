@@ -37,25 +37,50 @@
       </div>
 
       <div class="map-container">
-        <google-map 
-          height="300px" 
-          width="100%" 
-          [center]="mapCenter" 
-          [options]="mapOptions">
-          <map-marker 
-             *ngFor="let marker of markers" 
-             [position]="marker.position" 
-             [title]="marker.title" 
-             [label]="marker.label"
-             [options]="marker.options">
-           </map-marker>
-           <map-circle
-             *ngFor="let circle of circles"
-             [center]="circle.center"
-             [radius]="circle.radius"
-             [options]="circle.options">
-           </map-circle>
-         </google-map>
+        <ng-container *ngIf="isGoogleMapsReady; else mapsUnavailable">
+          <google-map
+            height="300px"
+            width="100%"
+            [center]="mapCenter"
+            [options]="mapOptions">
+            <map-marker
+               *ngFor="let marker of markers"
+               [position]="marker.position"
+               [title]="marker.title"
+               [label]="marker.label"
+               [options]="marker.options">
+             </map-marker>
+             <map-circle
+               *ngFor="let circle of circles"
+               [center]="circle.center"
+               [radius]="circle.radius"
+               [options]="circle.options">
+             </map-circle>
+           </google-map>
+        </ng-container>
+
+        <ng-template #mapsUnavailable>
+          <div class="info-card">
+            <h3>Map unavailable</h3>
+            <p>Google Maps is not configured for this environment.</p>
+            <div *ngIf="isLocalhost" class="form-group">
+              <label for="mapsKey">Google Maps API Key</label>
+              <input
+                type="password"
+                id="mapsKey"
+                #mapsKeyInput
+                (input)="mapsApiKeyDraft = mapsKeyInput.value"
+                placeholder="Paste API key to enable the map"
+                autocomplete="off"
+                maxlength="200">
+              <div class="form-actions">
+                <app-button type="button" size="small" (btnClick)="enableGoogleMaps()">
+                  Enable Map
+                </app-button>
+              </div>
+            </div>
+          </div>
+        </ng-template>
       </div>
     </div>
 

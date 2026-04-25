@@ -1,0 +1,185 @@
+.employee-dashboard {
+  min-height: 100%;
+  background: #f9fafb;
+  padding: 32px 16px;
+}
+
+.employee-dashboard__container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-header__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.page-header__subtitle {
+  margin: 6px 0 0 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.page-header__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(55, 48, 163, 0.15);
+}
+
+.banner {
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.banner--success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid rgba(22, 101, 52, 0.15);
+}
+
+.bookings-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.booking-card {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.details__row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.details__label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.details__value {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.details__row--muted .details__value {
+  color: #334155;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-badge--pending {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.status-badge--confirmed {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-badge--assigned {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.status-badge--in-progress {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.status-badge--completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge--paid {
+  background: #166534;
+  color: #ffffff;
+}
+
+.status-badge--cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-badge--unknown {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn--confirm {
+  background: #16a34a;
+  border-color: rgba(22, 163, 74, 0.2);
+  color: #ffffff;
+}

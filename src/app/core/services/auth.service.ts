@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 
-export type AuthRole = 'admin' | 'user';
+export type AuthRole = 'admin' | 'supervisor' | 'user' | 'employee';
 
 export type AuthUser = {
   email?: string;
@@ -23,7 +24,10 @@ export class AuthService {
   private readonly userSubject = new BehaviorSubject<AuthUser | null>(this.decodeUser(this.tokenSubject.value));
   readonly user$ = this.userSubject.asObservable();
 
-  constructor(private readonly http: HttpClient) {
+  constructor(
+    private readonly http: HttpClient,
+    private readonly router: Router
+  ) {
     const token = this.tokenSubject.value;
     if (token && !this.decodeUser(token)) {
       this.clear();
@@ -71,12 +75,14 @@ export class AuthService {
 
   clear(): void {
     localStorage.removeItem(this.storageKey);
+    sessionStorage.removeItem(this.storageKey);
     this.tokenSubject.next(null);
     this.userSubject.next(null);
   }
 
   logout(): void {
     this.clear();
+    void this.router.navigateByUrl('/admin/login', { replaceUrl: true });
   }
 
   hasValidToken(): boolean {
@@ -88,6 +94,21 @@ export class AuthService {
   isAdmin(): boolean {
     const user = this.getUser();
     return user?.role === 'admin';
+  }
+
+  isSupervisor(): boolean {
+    const user = this.getUser();
+    return user?.role === 'supervisor';
+  }
+
+  isAdminOrSupervisor(): boolean {
+    const user = this.getUser();
+    return user?.role === 'admin' || user?.role === 'supervisor';
+  }
+
+  isEmployee(): boolean {
+    const user = this.getUser();
+    return user?.role === 'employee';
   }
 
   private readStoredToken(): string | null {
@@ -107,7 +128,14 @@ export class AuthService {
     if (!payload || typeof payload !== 'object') return null;
 
     const role = (payload as any).role;
-    if (role !== 'admin' && role !== 'user') return null;
+    if (
+      role !== 'admin' &&
+      role !== 'supervisor' &&
+      role !== 'user' &&
+      role !== 'employee'
+    ) {
+      return null;
+    }
 
     const exp = (payload as any).exp;
     if (typeof exp === 'number' && Number.isFinite(exp)) {

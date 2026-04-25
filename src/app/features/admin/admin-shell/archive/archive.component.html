@@ -1,0 +1,212 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div class="page-header__text">
+      <h1 class="page-header__title">Archive</h1>
+      <p class="page-header__subtitle">Completed and paid bookings</p>
+    </div>
+    <div class="page-header__meta">
+      <button type="button" class="btn btn--ghost" (click)="load()">Refresh</button>
+    </div>
+  </header>
+
+  <div class="state state--error" *ngIf="errorMessage">
+    <div class="state-card">
+      <div class="state-card__icon">!</div>
+      <div class="state-card__text">
+        <div class="state-card__title">Archive</div>
+        <div class="state-card__subtitle">{{ errorMessage }}</div>
+      </div>
+      <div class="state-card__actions">
+        <button type="button" class="btn btn--ghost" (click)="load()">Retry</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="state state--loading" *ngIf="isLoading">
+    <div class="spinner" aria-label="Loading"></div>
+  </div>
+
+  <div class="table-wrap" *ngIf="!isLoading && !errorMessage">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Customer Name</th>
+          <th>Address</th>
+          <th>Service</th>
+          <th>Assigned Employee</th>
+          <th>Final Price</th>
+          <th>Status</th>
+          <th class="table__actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="let b of bookings; trackBy: trackByBookingId"
+          [class.row--call-client]="getRowFlag(b._id) === 'call_client'"
+          [class.row--pending-invoice]="getRowFlag(b._id) === 'pending_invoice'"
+          [class.row--payment-issue]="getRowFlag(b._id) === 'payment_issue'"
+          [class.row--archived]="getRowFlag(b._id) === 'archived'"
+        >
+          <td>{{ b.desiredDate }} · {{ b.desiredTime }}</td>
+          <td>{{ b.name }}</td>
+          <td>{{ b.address }}</td>
+          <td>{{ getServiceDisplay(b) }}</td>
+          <td>{{ getAssignedEmployee(b) }}</td>
+          <td>{{ getFinalPrice(b) }}</td>
+          <td>
+            <div class="status-cell">
+              <span class="status-cell__text">{{ b.status }}</span>
+              <span class="flag-pill" *ngIf="getRowFlagLabel(b._id)">{{ getRowFlagLabel(b._id) }}</span>
+            </div>
+          </td>
+          <td class="table__actions">
+            <div class="actions-group">
+              <button type="button" class="btn btn--ghost action-btn" (click)="openDetails(b)">View details</button>
+              <button type="button" class="btn btn--ghost action-btn" (click)="exportInvoicePdf(b)">Export</button>
+
+              <div class="flag-dropdown" [class.is-open]="openFlagMenuBookingId === b._id">
+                <button type="button" class="btn btn--ghost action-btn action-btn--dropdown" (click)="cycleRowFlag(b._id)">
+                  <span class="action-btn__label">{{ getRowFlagLabel(b._id) || 'Mark archived' }}</span>
+                  <span class="action-btn__chev" aria-hidden="true"></span>
+                </button>
+                <div class="flag-dropdown__menu" *ngIf="openFlagMenuBookingId === b._id">
+                  <button type="button" class="flag-item flag-item--info" (click)="setRowFlag(b._id, 'call_client')">Call client</button>
+                  <button
+                    type="button"
+                    class="flag-item flag-item--warn"
+                    (click)="setRowFlag(b._id, 'pending_invoice')"
+                  >
+                    Pending invoice
+                  </button>
+                  <button type="button" class="flag-item flag-item--danger" (click)="setRowFlag(b._id, 'payment_issue')">
+                    Payment issue
+                  </button>
+                  <button type="button" class="flag-item flag-item--success" (click)="setRowFlag(b._id, 'archived')">
+                    Completed / archived
+                  </button>
+                  <div class="flag-divider"></div>
+                  <button type="button" class="flag-item flag-item--neutral" (click)="setRowFlag(b._id, 'none')">Clear</button>
+                </div>
+                <button
+                  type="button"
+                  class="flag-dropdown__backdrop"
+                  *ngIf="openFlagMenuBookingId === b._id"
+                  (click)="closeFlagMenu()"
+                  aria-label="Close"
+                ></button>
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="bookings.length === 0">
+          <td colspan="8" class="table__empty">No archived bookings found.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal" *ngIf="isDetailsOpen && selectedBooking as b">
+    <div class="modal__backdrop" (click)="closeDetails()"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Booking details">
+      <div class="modal__header">
+        <div class="modal__title">Booking details</div>
+        <button type="button" class="btn btn--ghost" (click)="closeDetails()">Close</button>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-section">
+          <div class="detail-section__title">Customer</div>
+          <div class="kv">
+            <div class="kv__row"><span class="kv__k">Name</span><span class="kv__v">{{ b.display?.customer?.name || b.name || '-' }}</span></div>
+            <div class="kv__row"><span class="kv__k">Email</span><span class="kv__v">{{ b.display?.customer?.email || b.email || '-' }}</span></div>
+            <div class="kv__row"><span class="kv__k">Phone</span><span class="kv__v">{{ b.display?.customer?.phone || b.phone || '-' }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section__title">Service & Schedule</div>
+          <div class="kv">
+            <div class="kv__row"><span class="kv__k">Service</span><span class="kv__v">{{ getServiceDisplay(b) }}</span></div>
+            <div class="kv__row"><span class="kv__k">Schedule</span><span class="kv__v">{{ b.desiredDate }} · {{ b.desiredTime }}</span></div>
+            <div class="kv__row"><span class="kv__k">Status</span><span class="kv__v">{{ b.status }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section__title">Property</div>
+          <div class="kv">
+            <div class="kv__row"><span class="kv__k">Address</span><span class="kv__v">{{ b.display?.property?.address || b.address || '-' }}</span></div>
+            <div class="kv__row" *ngFor="let row of (b.display?.property?.details || [])">
+              <span class="kv__k">{{ row.label }}</span>
+              <span class="kv__v">{{ row.value }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section__title">Assignment & Timestamps</div>
+          <div class="kv">
+            <div class="kv__row"><span class="kv__k">Supervisor</span><span class="kv__v">{{ getSupervisorDisplay(b) }}</span></div>
+            <div class="kv__row"><span class="kv__k">Employees</span><span class="kv__v">{{ getEmployeesDisplay(b) }}</span></div>
+            <div class="kv__row"><span class="kv__k">Assigned</span><span class="kv__v">{{ getAssignedAt(b) || '-' }}</span></div>
+            <div class="kv__row"><span class="kv__k">Started</span><span class="kv__v">{{ getStartedAt(b) || '-' }}</span></div>
+            <div class="kv__row"><span class="kv__k">Completed</span><span class="kv__v">{{ getCompletedAt(b) || '-' }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section__title">Extras</div>
+          <div class="kv">
+            <div class="kv__row">
+              <span class="kv__k">Items</span>
+              <span class="kv__v">
+                <ng-container *ngIf="getExtrasItems(b).length; else noExtras">
+                  {{ getExtrasItems(b).join(', ') }}
+                </ng-container>
+                <ng-template #noExtras>-</ng-template>
+              </span>
+            </div>
+            <div class="kv__row" *ngIf="b.display?.extras?.summary">
+              <span class="kv__k">Summary</span>
+              <span class="kv__v">{{ b.display?.extras?.summary }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section__title">Notes</div>
+          <div class="kv">
+            <div class="kv__row">
+              <span class="kv__k">Customer notes</span>
+              <span class="kv__v kv__v--wrap">{{ getNotes(b) || '-' }}</span>
+            </div>
+            <div class="kv__row" *ngIf="getSpecialConditions(b).length">
+              <span class="kv__k">Special conditions</span>
+              <span class="kv__v kv__v--wrap">{{ getSpecialConditions(b).join(', ') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section detail-section--full">
+          <div class="detail-section__title">Pricing</div>
+          <div class="pricing" *ngIf="getPricingItems(b).length; else pricingFallback">
+            <div class="pricing__row" *ngFor="let p of getPricingItems(b)">
+              <span class="pricing__k">{{ p.label }}</span>
+              <span class="pricing__v">${{ p.amount.toFixed(2) }}</span>
+            </div>
+            <div class="pricing__row pricing__row--total">
+              <span class="pricing__k">Total</span>
+              <span class="pricing__v">${{ getPricingTotal(b).toFixed(2) }}</span>
+            </div>
+          </div>
+          <ng-template #pricingFallback>
+            <div class="kv">
+              <div class="kv__row"><span class="kv__k">Total</span><span class="kv__v">{{ getFinalPrice(b) }}</span></div>
+            </div>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

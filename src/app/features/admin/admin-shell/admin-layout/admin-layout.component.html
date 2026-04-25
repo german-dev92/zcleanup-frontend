@@ -1,0 +1,78 @@
+<div class="admin-shell" [class.admin-shell--sidebar-open]="isSidebarOpen">
+  <header class="admin-shell__topbar">
+    <button
+      type="button"
+      class="admin-shell__hamburger"
+      (click)="toggleSidebar()"
+      [attr.aria-expanded]="isSidebarOpen"
+      aria-label="Toggle admin navigation"
+    >
+      <span class="admin-shell__hamburger-bar"></span>
+      <span class="admin-shell__hamburger-bar"></span>
+      <span class="admin-shell__hamburger-bar"></span>
+    </button>
+    <div class="admin-shell__topbar-title">Admin Dashboard</div>
+  </header>
+
+  <div class="admin-shell__backdrop" *ngIf="isSidebarOpen" (click)="closeSidebar()"></div>
+
+  <aside class="admin-shell__sidebar" [class.is-open]="isSidebarOpen">
+    <div class="admin-shell__brand-row">
+      <div class="admin-shell__brand">Admin Dashboard</div>
+      <button type="button" class="admin-shell__collapse" (click)="closeSidebar()" aria-label="Close navigation">
+        <span class="admin-shell__collapse-bar"></span>
+        <span class="admin-shell__collapse-bar"></span>
+      </button>
+    </div>
+
+    <nav class="admin-shell__nav" aria-label="Admin navigation">
+      <a
+        class="admin-shell__nav-item"
+        routerLink="/admin/bookings"
+        routerLinkActive="is-active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
+      >
+        Booking Management
+      </a>
+      <a
+        class="admin-shell__nav-item"
+        routerLink="/admin/employees"
+        routerLinkActive="is-active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
+        *ngIf="!isSupervisor()"
+      >
+        Employee Management
+      </a>
+      <a
+        class="admin-shell__nav-item"
+        routerLink="/admin/archive"
+        routerLinkActive="is-active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
+        *ngIf="!isSupervisor()"
+      >
+        Archive
+      </a>
+      <a
+        class="admin-shell__nav-item"
+        routerLink="/admin/manual-booking"
+        routerLinkActive="is-active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
+        *ngIf="!isSupervisor()"
+      >
+        Manual Booking
+      </a>
+    </nav>
+
+    <div class="admin-shell__sidebar-footer">
+      <button type="button" class="btn btn--ghost admin-shell__logout" (click)="onLogout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="admin-shell__content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

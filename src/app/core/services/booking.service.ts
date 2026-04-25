@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import {
   Booking,
   BookingRequest,
@@ -18,96 +18,79 @@ export class BookingService {
 
   constructor(private http: HttpClient) {}
 
-  private normalizeApiBaseUrl(value: string): string {
-    let url = String(value ?? '').trim().replace(/\/+$/, '');
-    const lower = () => url.toLowerCase();
-
-    const stripSuffix = (suffix: string) => {
-      if (lower().endsWith(suffix)) {
-        url = url.slice(0, Math.max(0, url.length - suffix.length)).replace(/\/+$/, '');
-      }
-    };
-
-    stripSuffix('/api/booking');
-    stripSuffix('/booking');
-    stripSuffix('/api');
-
-    return url;
-  }
-
   // 🟢 Crear booking
   bookService(request: BookingRequest): Observable<BookingResponse> {
-    const directUrl = `${this.apiBaseUrl}/booking`;
-    const apiPrefixedUrl = `${this.apiBaseUrl}/api/booking`;
-
-    return this.http.post<BookingResponse>(directUrl, request).pipe(
-      catchError((err: any) => {
-        if (err?.status === 404) {
-          return this.http.post<BookingResponse>(apiPrefixedUrl, request);
-        }
-        return throwError(() => err);
-      })
-    );
+    return this.http.post<BookingResponse>(`${this.apiBaseUrl}/booking`, request);
   }
 
   getBookings(status?: string): Observable<Booking[]> {
-    const directUrl = `${this.apiBaseUrl}/booking`;
-    const apiPrefixedUrl = `${this.apiBaseUrl}/api/booking`;
     const params = typeof status === 'string' && status.trim()
       ? new HttpParams().set('status', status.trim())
       : undefined;
-
-    return this.http.get<Booking[]>(directUrl, { params }).pipe(
-      catchError((err: any) => {
-        if (err?.status === 404) {
-          return this.http.get<Booking[]>(apiPrefixedUrl, { params });
-        }
-        return throwError(() => err);
-      })
-    );
+    return this.http.get<Booking[]>(`${this.apiBaseUrl}/booking`, { params });
   }
 
   getBookingById(id: string): Observable<Booking> {
     const encodedId = encodeURIComponent(String(id ?? '').trim());
-    const directUrl = `${this.apiBaseUrl}/booking/${encodedId}`;
-    const apiPrefixedUrl = `${this.apiBaseUrl}/api/booking/${encodedId}`;
-
-    return this.http.get<Booking>(directUrl).pipe(
-      catchError((err: any) => {
-        if (err?.status === 404) {
-          return this.http.get<Booking>(apiPrefixedUrl);
-        }
-        return throwError(() => err);
-      })
-    );
+    return this.http.get<Booking>(`${this.apiBaseUrl}/booking/${encodedId}`);
   }
 
   updateStatus(id: string, status: 'confirmed' | 'cancelled'): Observable<Booking> {
     const encodedId = encodeURIComponent(String(id ?? '').trim());
-    const baseUrl = this.normalizeApiBaseUrl(this.apiBaseUrl);
-    const directUrl = `${baseUrl}/booking/${encodedId}/status`;
     const body = { status };
-
-    if (!environment.production) {
-      console.log('[ADMIN PATCH FINAL URL]', directUrl);
-    }
-    return this.http.patch<Booking>(directUrl, body);
+    return this.http
+      .patch<any>(`${this.apiBaseUrl}/booking/${encodedId}/status`, body)
+      .pipe(
+        map(
+          (res) =>
+            (res && typeof res === 'object' && 'data' in res
+              ? (res as any).data
+              : res) as Booking,
+        ),
+      );
   }
 
-  // 🔥 VALIDACIÓN DE DESCUENTO (VERSIÓN SEGURA Y CONSISTENTE)
-  checkDiscount(email: string): Observable<DiscountCheckResponse> {
-    const encodedEmail = encodeURIComponent(email.trim().toLowerCase());
-
-    const directUrl = `${this.apiBaseUrl}/discounts/check/${encodedEmail}`;
-    const apiPrefixedUrl = `${this.apiBaseUrl}/api/discounts/check/${encodedEmail}`;
-
-    return this.http.get<DiscountCheckResponse>(directUrl).pipe(
-      catchError((err: any) => {
-        if (err?.status === 404) {
-          return this.http.get<DiscountCheckResponse>(apiPrefixedUrl);
-        }
-        return throwError(() => err);
-      })
+  assignBooking(bookingId: string, supervisorId: string, employeeIds: string[]): Observable<Booking> {
+    const encodedId = encodeURIComponent(String(bookingId ?? '').trim());
+    const supId = String(supervisorId ?? '').trim();
+    const ids = Array.isArray(employeeIds) ? employeeIds : [];
+    const normalizedEmployeeIds = Array.from(
+      new Set(ids.map((x) => String(x ?? '').trim()).filter(Boolean))
     );
+    const body = { supervisorId: supId, employeeIds: normalizedEmployeeIds };
+    return this.http.patch<any>(`${this.apiBaseUrl}/booking/${encodedId}/assign`, body).pipe(
+      map((res) => (res && typeof res === 'object' && 'data' in res ? (res as any).data : res) as Booking)
+    );
+  }
+
+  startBooking(id: string): Observable<Booking> {
+    const encodedId = encodeURIComponent(String(id ?? '').trim());
+    return this.http.patch<any>(`${this.apiBaseUrl}/booking/${encodedId}/start`, {}).pipe(
+      map((res) => (res && typeof res === 'object' && 'data' in res ? (res as any).data : res) as Booking)
+    );
+  }
+
+  completeBooking(id: string): Observable<Booking> {
+    const encodedId = encodeURIComponent(String(id ?? '').trim());
+    return this.http.patch<any>(`${this.apiBaseUrl}/booking/${encodedId}/complete`, {}).pipe(
+      map((res) => (res && typeof res === 'object' && 'data' in res ? (res as any).data : res) as Booking)
+    );
+  }
+
+  getAssignedBookings(): Observable<Booking[]> {
+    return this.http.get<Booking[]>(`${this.apiBaseUrl}/booking/assigned`);
+  }
+
+  checkDiscount(params: { email?: string; address?: string }): Observable<DiscountCheckResponse> {
+    const body: any = {};
+    const email = String(params?.email ?? '').trim().toLowerCase();
+    const address = String(params?.address ?? '').trim();
+    if (email) body.email = email;
+    if (address) body.address = address;
+    return this.http.post<DiscountCheckResponse>(`${this.apiBaseUrl}/discounts/check`, body);
+  }
+
+  pricePreview(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.apiBaseUrl}/booking/price-preview`, payload);
   }
 }

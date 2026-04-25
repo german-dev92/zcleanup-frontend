@@ -1,7 +1,7 @@
 export interface BookingRequest {
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   address: string;
   cleaningType: string;
   desiredDate: string;
@@ -12,20 +12,44 @@ export interface BookingRequest {
   frequency: string;
   extras: string[];
   dynamicFields: BookingDynamicFields;
-  estimatedPrice: number | 'custom';
-  finalPricePreview: number;
 }
 
 export interface Booking {
   _id: string;
   name: string;
   email: string;
+  phone?: string;
   address: string;
   cleaningType: string;
   desiredDate: string;
   desiredTime: string;
-  status: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  frequency?: string;
+  petsAtHome?: boolean;
+  useOwnProducts?: boolean;
+  applyFirstDiscount?: boolean;
+  extras?: unknown[];
+  estimatedPrice?: number;
+  finalPricePreview?: number;
+  dynamicFields?: BookingDynamicFields;
+  status:
+    | 'pending'
+    | 'confirmed'
+    | 'assigned'
+    | 'in_progress'
+    | 'completed'
+    | 'paid'
+    | 'cancelled';
   paymentUrl?: string;
+  assignedEmployeeId?: string;
+  assignedEmployeeEmail?: string;
+  assignedSupervisor?: {
+    employeeId?: string;
+    name?: string;
+  };
+  assignedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  display?: BookingDisplayViewModel;
   payment?: {
     provider?: 'stripe' | 'square';
     status?: 'pending' | 'paid' | 'failed' | 'refunded';
@@ -47,6 +71,7 @@ export type BookingDynamicFields = {
 
   bedrooms?: number;
   bathrooms?: number;
+  additionalBedrooms?: number;
 
   moveMode?: 'move_out' | 'move_in' | 'both';
   moPackage?: string;
@@ -62,6 +87,9 @@ export type BookingDynamicFields = {
   cleaners?: number;
 
   units?: number;
+
+  postConstruction?: { hours?: number; cleaners?: number };
+  windowCleaning?: { windowCount?: number };
 };
 
 export interface BookingResponse {
@@ -87,4 +115,39 @@ export interface BookingResponse {
 export interface DiscountCheckResponse {
   email: string;
   canUseDiscount: boolean;
+}
+
+export interface BookingDisplayViewModel {
+  customer?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  service?: {
+    code?: string;
+    label?: string;
+  };
+  schedule?: {
+    date?: string;
+    time?: string;
+    frequency?: {
+      code?: string;
+      label?: string;
+    };
+  };
+  property?: {
+    address?: string;
+    details?: Array<{ label: string; value: string }>;
+  };
+  extras?: {
+    items?: Array<{ type?: string; label?: string; quantity?: number }>;
+    summary?: string;
+  };
+  notes?: string;
+  specialConditions?: string[];
+  pricing?: {
+    currency?: string;
+    items?: Array<{ label: string; amount: number }>;
+    total?: number;
+  };
 }

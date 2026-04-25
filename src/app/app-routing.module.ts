@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/admin.guard';
+import { EmployeeGuard } from './core/guards/employee.guard';
 
 const routes: Routes = [
   {
@@ -36,13 +37,18 @@ const routes: Routes = [
     loadChildren: () => import('./features/promotions/promotions.module').then(m => m.PromotionsModule)
   },
   {
-    path: 'admin/bookings',
-    canActivate: [AuthGuard],
-    loadChildren: () => import('./features/admin/bookings/admin-bookings.module').then(m => m.AdminBookingsModule)
-  },
-  {
     path: 'admin/login',
     loadChildren: () => import('./features/admin/login/admin-login.module').then(m => m.AdminLoginModule)
+  },
+  {
+    path: 'admin',
+    canActivate: [AuthGuard],
+    loadChildren: () => import('./features/admin/admin-shell/admin-shell.module').then(m => m.AdminShellModule)
+  },
+  {
+    path: 'employee-dashboard',
+    canActivate: [EmployeeGuard],
+    loadChildren: () => import('./features/employee-dashboard/employee-dashboard.module').then(m => m.EmployeeDashboardModule)
   },
   {
     path: '**',
