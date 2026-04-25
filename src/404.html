@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ZCleanUp</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      (function () {
+        var l = window.location;
+        var basePath = '/zcleanup-frontend/';
+        var restPath =
+          l.pathname.slice(basePath.length).replace(/^\/+/, '') || '';
+        var search = l.search ? l.search.slice(1) : '';
+        var hash = l.hash ? l.hash.slice(1) : '';
+
+        var target =
+          basePath +
+          '?p=' +
+          encodeURIComponent(restPath) +
+          '&q=' +
+          encodeURIComponent(search) +
+          '&h=' +
+          encodeURIComponent(hash);
+        l.replace(l.protocol + '//' + l.host + target);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

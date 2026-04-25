@@ -6,6 +6,25 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script>
+    (function () {
+      var l = window.location;
+      if (!l.search) return;
+      var params = new URLSearchParams(l.search);
+      var p = params.get('p');
+      if (p === null) return;
+      var q = params.get('q') || '';
+      var h = params.get('h') || '';
+      var basePath = l.pathname;
+      var path = String(p || '').replace(/^\/+/, '');
+      var next =
+        basePath +
+        path +
+        (q ? '?' + q : '') +
+        (h ? '#' + h : '');
+      window.history.replaceState(null, '', next);
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">

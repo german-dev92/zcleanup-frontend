@@ -1028,7 +1028,6 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     this.isSubmitting = true;
     const bookingData = this.buildSanitizedBookingData();
-    console.log('[SANITIZED BOOKING PAYLOAD]', bookingData);
 
     this.bookingService.bookService(bookingData).subscribe({
       next: (response) => {
