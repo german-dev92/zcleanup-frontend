@@ -167,17 +167,17 @@
   }
 
   .admin-shell__topbar {
-    display: flex;
+    display: flex !important;
     position: sticky;
     top: 0;
     z-index: 1000;
   }
 
-  .admin-shell:not(.admin-shell--sidebar-open) .admin-shell__sidebar {
-    width: min(280px, 86vw);
-    overflow: visible;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    pointer-events: auto;
+  .admin-shell__hamburger {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .admin-shell__backdrop {
@@ -192,15 +192,97 @@
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    height: min(100vh, 100dvh);
     width: min(280px, 86vw);
     z-index: 1001;
     transform: translateX(-110%);
     transition: transform 0.2s ease;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    grid-row: auto;
   }
 
   .admin-shell__sidebar.is-open {
     transform: translateX(0);
+  }
+
+  .admin-shell:not(.admin-shell--sidebar-open) .admin-shell__sidebar {
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .admin-shell.admin-shell--sidebar-open .admin-shell__sidebar {
+    pointer-events: auto;
+    visibility: visible;
+  }
+
+  .admin-shell__collapse {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .admin-shell__nav-item {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    font-size: 15px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-shell__logout {
+    min-height: 44px;
+    font-size: 15px;
+  }
+
+  .admin-shell__content {
+    padding: 12px 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  .admin-shell__sidebar {
+    width: min(280px, 88vw);
+  }
+
+  .admin-shell__topbar {
+    padding: 10px 12px;
+  }
+
+  .admin-shell__topbar-title {
+    font-size: 15px;
+  }
+
+  .admin-shell__content {
+    padding: 10px 6px;
+  }
+}
+
+@media (max-width: 320px) {
+  .admin-shell__sidebar {
+    width: 92vw;
+  }
+
+  .admin-shell__brand-row {
+    padding: 12px;
+  }
+
+  .admin-shell__nav {
+    padding: 6px;
+    gap: 2px;
+  }
+
+  .admin-shell__nav-item {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .admin-shell__content {
+    padding: 12px 10px;
   }
 }

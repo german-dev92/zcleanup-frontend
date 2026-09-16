@@ -12,5 +12,29 @@
   padding: 10px 12px;
   border-radius: 12px;
   margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+@media (max-width: 430px) {
+  .admin-page {
+    padding: 12px 8px;
+  }
+
+  .banner--info {
+    padding: 10px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 320px) {
+  .admin-page {
+    padding: 10px 6px;
+  }
+
+  .banner--info {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
 }
 

@@ -13,23 +13,23 @@ import { HeroSlide } from './hero-slider/hero-slider.component';
 export class HomeComponent implements OnInit {
   heroSlides: HeroSlide[] = [
     { 
-      src: 'assets/images/underground/Home_Cleaning_port.png',
+      src: 'assets/images/backgrounds/Home_Cleaning_port.png',
       alt: 'Professional Home Cleaning Services'
     },
     { 
-      src: 'assets/images/underground/Apartment_Cleaning_port.jpg',
+      src: 'assets/images/backgrounds/Apartment_Cleaning_port.jpg',
       alt: 'Expert Apartment and Condo Cleaning'
     },
     { 
-      src: 'assets/images/underground/Post-Construction_Cleaning_port.jpg',
+      src: 'assets/images/backgrounds/Post-Construction_Cleaning_port.jpg',
       alt: 'Post-Construction Cleanup Experts'
     },
     { 
-      src: 'assets/images/underground/Deep_Cleaning_port.jpg',
+      src: 'assets/images/backgrounds/Deep_Cleaning_port.jpg',
       alt: 'Thorough Deep Cleaning for your Space'
     },
     { 
-      src: 'assets/images/underground/Window_Cleaning_port.jpg',
+      src: 'assets/images/backgrounds/Window_Cleaning_port.jpg',
       alt: 'Streak-Free Window Cleaning Services'
     }
   ];

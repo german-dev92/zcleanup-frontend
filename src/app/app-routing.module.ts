@@ -33,6 +33,10 @@ const routes: Routes = [
     loadChildren: () => import('./features/booking/booking.module').then(m => m.BookingModule)
   },
   {
+    path: 'custom-quote',
+    loadChildren: () => import('./features/custom-quote/custom-quote.module').then(m => m.CustomQuoteModule)
+  },
+  {
     path: 'promotions',
     loadChildren: () => import('./features/promotions/promotions.module').then(m => m.PromotionsModule)
   },

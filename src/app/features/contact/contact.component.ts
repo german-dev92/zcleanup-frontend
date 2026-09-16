@@ -1,43 +1,40 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import * as L from 'leaflet';
 import { ContactService } from '../../core/services/contact.service';
 import { GeolocationService } from '../../core/services/geolocation.service';
+import { CoverageCity } from '../../core/models/location.model';
 import { SafeLoggerService } from '../../core/services/safe-logger.service';
 import { sanitizeEmail, sanitizeMultiline, sanitizeText } from '../../shared/security/input-sanitizer';
 import { noControlChars, noHtmlLikeInput, trimmedMinLength } from '../../shared/security/security-validators';
+
+const LEAFLET_PRIMARY_COLOR = '#2c7fb8';
+const LEAFLET_CIRCLE_FILL_OPACITY = 0.18;
+const LEAFLET_CIRCLE_BORDER_WEIGHT = 2.5;
+const LEAFLET_CIRCLE_BORDER_OPACITY = 0.9;
+const LEAFLET_KM_PER_DEG_LAT = 111;
+
+const configureLeafletIcons = (): void => {
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'assets/leaflet/marker-icon-2x.png',
+    iconUrl: 'assets/leaflet/marker-icon.png',
+    shadowUrl: 'assets/leaflet/marker-shadow.png'
+  });
+};
 
 @Component({
   selector: 'app-contact',
   templateUrl: './contact.component.html',
   styleUrls: ['./contact.component.scss']
 })
-export class ContactComponent implements OnInit, OnDestroy {
+export class ContactComponent implements OnInit, AfterViewInit, OnDestroy {
   contactForm!: FormGroup;
   isSubmitting = false;
   submitSuccess = false;
   submitMessage = '';
-  isGoogleMapsReady = false;
-  isLocalhost = false;
-  mapsApiKeyDraft = '';
-  private googleMapsCheckTimer: number | null = null;
 
-  // Map options
-  mapCenter: google.maps.LatLngLiteral = { lat: 27.9506, lng: -82.4572 }; // Tampa center
-  mapOptions: google.maps.MapOptions = {
-    zoom: 9.5,
-    scrollwheel: true,
-    disableDefaultUI: false,
-    styles: [
-      {
-        featureType: 'poi',
-        elementType: 'labels',
-        stylers: [{ visibility: 'off' }]
-      }
-    ]
-  };
-  
-  markers: any[] = [];
-  circles: any[] = [];
+  private coverageMap: L.Map | null = null;
+  private mapLayers: L.Layer[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -47,82 +44,94 @@ export class ContactComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.isLocalhost =
-      typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1');
     this.initForm();
-    this.initMapData();
-    this.startGoogleMapsDetection();
+  }
+
+  ngAfterViewInit(): void {
+    this.initCoverageMap();
   }
 
   ngOnDestroy(): void {
-    if (this.googleMapsCheckTimer !== null) {
-      window.clearInterval(this.googleMapsCheckTimer);
-      this.googleMapsCheckTimer = null;
+    if (this.coverageMap) {
+      this.coverageMap.remove();
+      this.coverageMap = null;
     }
+    this.mapLayers = [];
   }
 
-  private startGoogleMapsDetection(): void {
-    const isReady = () => !!(window as any)?.google?.maps;
-    this.isGoogleMapsReady = isReady();
-    if (this.isGoogleMapsReady) return;
+  private initCoverageMap(): void {
+    if (this.coverageMap) return;
 
-    let tries = 0;
-    this.googleMapsCheckTimer = window.setInterval(() => {
-      tries += 1;
-      this.isGoogleMapsReady = isReady();
-      if (this.isGoogleMapsReady || tries >= 40) {
-        if (this.googleMapsCheckTimer !== null) {
-          window.clearInterval(this.googleMapsCheckTimer);
-          this.googleMapsCheckTimer = null;
-        }
-      }
-    }, 250);
-  }
+    const container = document.getElementById('coverage-map');
+    if (!container) return;
 
-  enableGoogleMaps(): void {
-    const key = String(this.mapsApiKeyDraft ?? '').trim();
-    if (!key) return;
-    try {
-      localStorage.setItem('ZC_GOOGLE_MAPS_API_KEY', key);
-      window.location.reload();
-    } catch {
-      return;
-    }
-  }
+    configureLeafletIcons();
 
-  initMapData(): void {
+    const map = L.map(container, {
+      scrollWheelZoom: false,
+      attributionControl: true,
+      minZoom: 10,
+      maxZoom: 15
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
     const cities = this.geolocationService.getCoverageCitiesDetails();
-    const primaryColor = '#3498db'; // Default primary blue color
-    const googleAnimationDrop = (window as any)?.google?.maps?.Animation?.DROP;
+    const bounds = L.latLngBounds([]);
 
-    this.markers = cities.map(city => ({
-      position: { lat: city.lat, lng: city.lng },
-      label: {
-        text: city.name,
-        color: '#2c3e50',
-        fontWeight: 'bold',
-        fontSize: '12px'
-      },
+    cities.forEach((city) => {
+      const cityBounds = this.addCoverageCity(map, city);
+      bounds.extend(cityBounds);
+    });
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.12), { maxZoom: 12 });
+    }
+
+    this.coverageMap = map;
+  }
+
+  private addCoverageCity(map: L.Map, city: CoverageCity): L.LatLngBounds {
+    const latLng: L.LatLngTuple = [city.lat, city.lng];
+    const radiusMeters = city.radiusKm * 1000;
+
+    const circle = L.circle(latLng, {
+      radius: radiusMeters,
+      color: LEAFLET_PRIMARY_COLOR,
+      opacity: LEAFLET_CIRCLE_BORDER_OPACITY,
+      weight: LEAFLET_CIRCLE_BORDER_WEIGHT,
+      fillColor: LEAFLET_PRIMARY_COLOR,
+      fillOpacity: LEAFLET_CIRCLE_FILL_OPACITY,
+      interactive: false
+    }).addTo(map);
+
+    const marker = L.marker(latLng, {
       title: city.name,
-      options: googleAnimationDrop ? { animation: googleAnimationDrop } : {}
-    }));
+      alt: city.name
+    }).bindTooltip(city.name, {
+      permanent: true,
+      direction: 'top',
+      offset: [0, -12],
+      className: 'coverage-city-tooltip'
+    }).addTo(map);
 
-    this.circles = cities.map(city => ({
-      center: { lat: city.lat, lng: city.lng },
-      radius: city.radiusKm * 1000, // Convert Km to meters
-      options: {
-        strokeColor: primaryColor,
-        strokeOpacity: 0.7,
-        strokeWeight: 2,
-        fillColor: primaryColor,
-        fillOpacity: 0.2,
-        clickable: false,
-        editable: false,
-        zIndex: 1
-      }
-    }));
+    this.mapLayers.push(circle, marker);
+
+    return this.computeCircleBounds(city.lat, city.lng, city.radiusKm);
+  }
+
+  private computeCircleBounds(lat: number, lng: number, radiusKm: number): L.LatLngBounds {
+    const deltaLat = radiusKm / LEAFLET_KM_PER_DEG_LAT;
+    const cosLat = Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
+    const deltaLng = radiusKm / (LEAFLET_KM_PER_DEG_LAT * cosLat);
+
+    const southWest: L.LatLngTuple = [lat - deltaLat, lng - deltaLng];
+    const northEast: L.LatLngTuple = [lat + deltaLat, lng + deltaLng];
+    return L.latLngBounds(southWest, northEast);
   }
 
   initForm(): void {

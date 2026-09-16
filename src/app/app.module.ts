@@ -7,6 +7,17 @@ import { NavbarComponent } from './layout/navbar/navbar.component';
 import { FooterComponent } from './layout/footer/footer.component';
 import { SecurityInterceptor } from './core/interceptors/security.interceptor';
 import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+import { HttpDebugInterceptor } from './core/interceptors/http-debug.interceptor';
+import { environment } from '../environments/environment';
+import { ApiModule } from './core/api/api.module';
+
+const httpInterceptorProviders = [
+  { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
+  { provide: HTTP_INTERCEPTORS, useClass: SecurityInterceptor, multi: true },
+  ...(environment.production
+    ? []
+    : [{ provide: HTTP_INTERCEPTORS, useClass: HttpDebugInterceptor, multi: true }])
+];
 
 @NgModule({
   declarations: [
@@ -17,12 +28,10 @@ import { AuthInterceptor } from './core/interceptors/auth.interceptor';
   imports: [
     BrowserModule,
     AppRoutingModule,
-    HttpClientModule
+    HttpClientModule,
+    ApiModule.forRoot({ rootUrl: environment.apiBaseUrl })
   ],
-  providers: [
-    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
-    { provide: HTTP_INTERCEPTORS, useClass: SecurityInterceptor, multi: true }
-  ],
+  providers: httpInterceptorProviders,
   bootstrap: [AppComponent]
 })
 export class AppModule { }

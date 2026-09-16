@@ -2,8 +2,8 @@
   <div class="admin-bookings__container">
     <header class="page-header">
       <div class="page-header__text">
-        <h1 class="page-header__title">Booking Management</h1>
-        <p class="page-header__subtitle">Manage and track all customer bookings</p>
+        <h1 class="page-header__title">Quote Review Board</h1>
+        <p class="page-header__subtitle">Review quote requests, send commercial responses and keep operational execution moving</p>
       </div>
       <div class="page-header__meta">
         <span class="count-badge">{{ filteredBookings.length }} shown · {{ bookings.length }} total</span>
@@ -74,6 +74,16 @@
             (ngModelChange)="onFiltersChanged()"
           />
         </div>
+        <div class="filters__field">
+          <label class="filters__label">Commercial</label>
+          <input
+            class="filters__input"
+            type="text"
+            placeholder="Quote status"
+            [(ngModel)]="filters.commercial"
+            (ngModelChange)="onFiltersChanged()"
+          />
+        </div>
       </div>
     </section>
 
@@ -138,7 +148,7 @@
       <article class="booking-card" *ngFor="let b of filteredBookings; trackBy: trackByBookingId">
         <div class="booking-card__header">
           <div class="booking-card__header-left">
-            <div class="summary-grid">
+            <div class="summary-grid summary-grid--redesign">
               <div class="summary-grid__left">
                 <div class="customer">
                   <div class="customer__name">
@@ -158,22 +168,29 @@
                 </div>
               </div>
 
-              <div class="summary-grid__right">
+              <div class="summary-grid__center">
                 <div class="details details--stack">
                   <div class="details__row details__row--stack">
-                    <span class="details__label">Service</span>
-                    <span class="details__value">{{ getServiceDisplay(b) }}</span>
+                    <span class="details__label">Service &amp; Schedule</span>
+                    <span class="details__value">{{ getServiceDisplay(b) }} · {{ getFrequencyDisplay(b) }} · {{ b.desiredDate }} · {{ b.desiredTime }}</span>
                   </div>
-                  <div class="details__row details__row--stack">
-                    <span class="details__label">Schedule</span>
-                    <span class="details__value">{{ b.desiredDate }} · {{ b.desiredTime }}</span>
-                  </div>
+                </div>
+                <div class="address-block">
+                  <div class="summary-grid__address-label">Address</div>
+                  <div class="summary-grid__address-value">{{ b.address }}</div>
                 </div>
               </div>
 
-              <div class="summary-grid__address">
-                <div class="summary-grid__address-label">Address</div>
-                <div class="summary-grid__address-value">{{ b.address }}</div>
+              <div class="summary-grid__price">
+                <div class="final-price-pill">
+                  <div class="final-price-pill__label">Final Price</div>
+                  <div class="final-price-pill__value" *ngIf="getCanonicalFinalPrice(b) !== null">
+                    {{ getCanonicalFinalPrice(b) | currency:'USD':'symbol':'1.2-2' }}
+                  </div>
+                  <div class="final-price-pill__value final-price-pill__value--muted" *ngIf="getCanonicalFinalPrice(b) === null">
+                    Pending
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -182,10 +199,141 @@
             <div class="header-actions">
               <div class="status">
                 <span class="status-badge" [ngClass]="getStatusClass(b.status)">{{ getStatusLabel(b.status) }}</span>
+                <span class="status-badge" [ngClass]="getCommercialStatusClass(b)">{{ getCommercialStatusLabel(b) }}</span>
                 <button type="button" class="btn btn--ghost btn--tiny" (click)="toggleDetails(b._id)">
                   {{ isExpanded(b._id) ? 'Hide' : 'Details' }}
                 </button>
               </div>
+
+              <details class="collapsible collapsible--header" *ngIf="isAdminOnly() && isQuoteFlowBooking(b)" [id]="'discount-panel-'+b._id">
+                <summary class="collapsible__summary">
+                  <span class="collapsible__title">Discount & Pricing</span>
+                  <span class="collapsible__meta">
+                    {{ getQuoteStatusLabel(b) }}
+                  </span>
+                </summary>
+                <div class="collapsible__content">
+                  <div class="quote-editor">
+                    <div class="quote-editor__grid">
+                      <div class="assign-row__col">
+                        <div class="assign-row__label">Original Calculated Price</div>
+                        <input
+                          class="assign-row__select"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          [ngModel]="getQuoteDraftState(b._id, b).baseCalculatedPrice"
+                          disabled
+                        />
+                      </div>
+                      <div class="assign-row__col">
+                        <div class="assign-row__label">Admin Discount</div>
+                        <select
+                          class="assign-row__select"
+                          [ngModel]="getQuoteDraftState(b._id, b).discountType"
+                          (ngModelChange)="updateQuoteDraftField(b._id, 'discountType', $event, b)"
+                          [disabled]="!canEditQuoteDiscount(b) || isQuoteActionLoading(b._id)"
+                        >
+                          <option
+                            *ngFor="let opt of discountOptions"
+                            [ngValue]="opt.id"
+                          >{{ opt.label }}</option>
+                        </select>
+                      </div>
+                      <div class="assign-row__col">
+                        <div class="assign-row__label">Discount Amount</div>
+                        <input
+                          class="assign-row__select"
+                          type="text"
+                          [value]="getPreviewQuoteDiscountAmount(b._id, b) === null
+                                   ? '-'
+                                   : '-'+(getPreviewQuoteDiscountAmount(b._id, b) | currency:'USD':'symbol':'1.2-2')"
+                          disabled
+                        />
+                      </div>
+                      <div class="assign-row__col">
+                        <div class="assign-row__label">Final Quote</div>
+                        <input
+                          class="assign-row__select"
+                          type="text"
+                          [value]="getPreviewFinalQuotedPrice(b._id, b) === null
+                                   ? '-'
+                                   : (getPreviewFinalQuotedPrice(b._id, b) | currency:'USD':'symbol':'1.2-2')"
+                          disabled
+                        />
+                      </div>
+                      <div class="assign-row__col">
+                        <div class="assign-row__label">Internal Reason / Note</div>
+                        <input
+                          class="assign-row__select"
+                          type="text"
+                          maxlength="500"
+                          [ngModel]="getQuoteDraftState(b._id, b).discountReason"
+                          (ngModelChange)="updateQuoteDraftField(b._id, 'discountReason', $event, b)"
+                          [disabled]="!canEditQuoteDiscount(b) || isQuoteActionLoading(b._id)"
+                          placeholder="Optional note (does not affect price)."
+                        />
+                      </div>
+                    </div>
+
+                    <div class="actions">
+                      <button
+                        type="button"
+                        class="btn btn--ghost"
+                        (click)="cancelDiscountPanel(b)"
+                        [disabled]="isQuoteActionLoading(b._id)"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn--confirm"
+                        (click)="applyDiscount(b)"
+                        [disabled]="isQuoteActionLoading(b._id) || !canApplyDiscount(b)"
+                      >
+                        {{ isQuoteActionLoading(b._id) ? 'Applying…' : 'Apply Discount' }}
+                      </button>
+                    </div>
+
+                    <div class="helper-text" *ngIf="getQuoteActionHelperText(b)">{{ getQuoteActionHelperText(b) }}</div>
+                    <div class="action-state" *ngIf="isQuoteActionLoading(b._id)">Saving discount…</div>
+                    <div class="banner banner--success banner--compact" *ngIf="quoteActionMessageByBookingId[b._id]">
+                      {{ quoteActionMessageByBookingId[b._id] }}
+                    </div>
+
+                    <div class="quote-editor__divider" *ngIf="b.firstServiceDiscountRequested && isAdminOnly()"></div>
+
+                    <div class="quick-apply-block" *ngIf="isAdminOnly()">
+                      <div class="quick-apply-block__title">First-Service Quick Apply</div>
+                      <div class="quick-apply-block__body">
+                        <div class="actions actions--compact">
+                          <button
+                            type="button"
+                            class="btn btn--confirm"
+                            *ngIf="b.firstServiceDiscountRequested && !b.discountApplied"
+                            (click)="applyFirstServiceDiscount(b._id)"
+                            [disabled]="isApplyingFirstServiceDiscount(b._id) || !canApplyFirstServiceDiscount(b)"
+                          >
+                            {{ isApplyingFirstServiceDiscount(b._id) ? 'Applying…' : 'Apply 15% First-Service Discount' }}
+                          </button>
+                          <span class="chip chip--muted" *ngIf="!b.firstServiceDiscountRequested">Customer did not request first-service review</span>
+                          <span class="chip" *ngIf="b.discountApplied === true">First-Service Discount already applied</span>
+                        </div>
+                        <div class="helper-text helper-text--small" *ngIf="!canApplyFirstServiceDiscount(b) && b.firstServiceDiscountRequested && b.discountApplied !== true">
+                          {{ getApplyFirstServiceDiscountHelperText(b) }}
+                        </div>
+                        <div class="action-state" *ngIf="isApplyingFirstServiceDiscount(b._id)">Applying discount &amp; recording address usage…</div>
+                        <div class="banner banner--success banner--compact" *ngIf="discountActionSuccessByBookingId[b._id]">
+                          {{ discountActionSuccessByBookingId[b._id] }}
+                        </div>
+                        <div class="banner banner--error banner--compact" *ngIf="discountActionErrorByBookingId[b._id]">
+                          {{ discountActionErrorByBookingId[b._id] }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               <details class="collapsible collapsible--header" *ngIf="isAdminOnly()">
                 <summary class="collapsible__summary">
@@ -264,6 +412,18 @@
           <div class="booking-card__assignment-left">
             <div class="meta-strip">
               <div class="meta-strip__item">
+                <div class="meta-strip__k">Commercial</div>
+                <div class="meta-strip__v">{{ getCommercialStatusLabel(b) }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Quote</div>
+                <div class="meta-strip__v">{{ getQuoteStatusLabel(b) }}</div>
+              </div>
+              <div class="meta-strip__item">
+                <div class="meta-strip__k">Payment Flow</div>
+                <div class="meta-strip__v">{{ getPaymentLifecycleLabel(b) }}</div>
+              </div>
+              <div class="meta-strip__item">
                 <div class="meta-strip__k">Supervisor</div>
                 <div class="meta-strip__v">{{ getSupervisorDisplay(b) }}</div>
               </div>
@@ -290,19 +450,36 @@
             <div class="actions" *ngIf="isAdminOnly()">
               <button
                 type="button"
-                class="btn btn--confirm"
-                (click)="updateStatus(b._id, 'confirmed')"
-                [disabled]="isUpdating(b._id) || !canConfirm(b)"
+                class="btn btn--ghost btn--primary-ghost"
+                *ngIf="canShowReviewQuoteButton(b)"
+                (click)="startQuoteReview(b)"
+                [disabled]="isQuoteActionLoading(b._id) || !canStartQuoteReview(b)"
               >
-                Confirm
+                {{ isQuoteActionLoading(b._id) ? 'Starting Review…' : 'Review Quote' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn--confirm"
+                (click)="confirmAndSendPayment(b)"
+                [disabled]="isConfirmingSendPayment(b._id) || !canConfirmAndSendPayment(b)"
+              >
+                {{ isConfirmingSendPayment(b._id) ? 'Confirming…' : 'Confirm & Send Payment' }}
               </button>
               <button
                 type="button"
                 class="btn btn--cancel"
-                (click)="updateStatus(b._id, 'cancelled')"
-                [disabled]="isUpdating(b._id) || !canCancel(b)"
+                (click)="openCancelModal(b)"
+                [disabled]="!canSoftCancel(b)"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn--ghost btn--danger-outline"
+                (click)="openDeleteModal(b)"
+                [disabled]="!canDeletePermanent(b)"
+              >
+                Delete
               </button>
             </div>
             <div class="actions" *ngIf="isSupervisor()">
@@ -328,20 +505,28 @@
           </div>
         </div>
 
-        <div class="booking-card__details" *ngIf="isExpanded(b._id)">
-          <div class="detail-grid">
-            <div class="detail-section">
-              <div class="detail-section__title">Booking Info</div>
-              <div class="kv">
-                <div class="kv__row"><span class="kv__k">Service</span><span class="kv__v">{{ getServiceDisplay(b) }}</span></div>
-                <div class="kv__row"><span class="kv__k">Date</span><span class="kv__v">{{ b.desiredDate }}</span></div>
-                <div class="kv__row"><span class="kv__k">Time</span><span class="kv__v">{{ b.desiredTime }}</span></div>
-                <div class="kv__row"><span class="kv__k">Frequency</span><span class="kv__v">{{ getFrequencyDisplay(b) }}</span></div>
-              </div>
-            </div>
+        <div class="booking-card__divider" *ngIf="isAdminOnly() && (confirmActionSuccessByBookingId[b._id] || confirmActionErrorByBookingId[b._id] || (quoteActionMessageByBookingId[b._id] && canShowReviewQuoteButton(b)))"></div>
 
+        <div class="booking-card__action-feedback" *ngIf="isAdminOnly() && (confirmActionSuccessByBookingId[b._id] || confirmActionErrorByBookingId[b._id] || (quoteActionMessageByBookingId[b._id] && canShowReviewQuoteButton(b)))">
+          <div class="banner banner--success banner--compact" *ngIf="confirmActionSuccessByBookingId[b._id]">
+            {{ confirmActionSuccessByBookingId[b._id] }}
+          </div>
+          <div class="banner banner--error banner--compact" *ngIf="confirmActionErrorByBookingId[b._id]">
+            {{ confirmActionErrorByBookingId[b._id] }}
+          </div>
+          <div class="helper-text helper-text--small" *ngIf="getConfirmSendHelperText(b) && !confirmActionErrorByBookingId[b._id]">
+            {{ getConfirmSendHelperText(b) }}
+          </div>
+          <div class="banner banner--info banner--compact" *ngIf="quoteActionMessageByBookingId[b._id] && canShowReviewQuoteButton(b)">
+            {{ quoteActionMessageByBookingId[b._id] }}
+          </div>
+        </div>
+
+        <div class="booking-card__details" *ngIf="isExpanded(b._id)">
+          <div class="detail-grid detail-grid--redesign">
+            <!-- Panel 1 — Service & Property -->
             <div class="detail-section">
-              <div class="detail-section__title">Property</div>
+              <div class="detail-section__title">Service &amp; Property</div>
               <div class="kv" *ngIf="getPropertyDetails(b).length; else noPropertyDetails">
                 <div class="kv__row" *ngFor="let row of getPropertyDetails(b)">
                   <span class="kv__k">{{ row.label }}</span>
@@ -351,54 +536,404 @@
               <ng-template #noPropertyDetails>
                 <div class="detail-muted">No property details.</div>
               </ng-template>
-            </div>
 
-            <div class="detail-section">
-              <div class="detail-section__title">Extras</div>
-              <div class="chips" *ngIf="getExtrasItems(b).length; else noExtras">
-                <span class="chip" *ngFor="let x of getExtrasItems(b)">
-                  {{ x.label }}<ng-container *ngIf="x.quantity && x.quantity > 1"> × {{ x.quantity }}</ng-container>
-                </span>
+              <div class="detail-subsection" *ngIf="getExtrasItems(b).length">
+                <div class="detail-subsection__title">Extras</div>
+                <div class="chips">
+                  <span class="chip" *ngFor="let x of getExtrasItems(b)">
+                    {{ x.label }}<ng-container *ngIf="x.quantity && x.quantity > 1"> × {{ x.quantity }}</ng-container>
+                  </span>
+                </div>
               </div>
-              <ng-template #noExtras>
-                <div class="detail-muted">No extras selected.</div>
-              </ng-template>
+              <div class="detail-muted detail-subsection" *ngIf="!getExtrasItems(b).length">No extras selected.</div>
             </div>
 
+            <!-- Panel 2 — Commercial & Quote -->
             <div class="detail-section">
-              <div class="detail-section__title">Customer Notes</div>
-              <div class="note-box" *ngIf="getCustomerNotes(b); else noCustomerNotes">{{ getCustomerNotes(b) }}</div>
-              <ng-template #noCustomerNotes>
-                <div class="detail-muted">No notes provided.</div>
-              </ng-template>
-            </div>
-
-            <div class="detail-section">
-              <div class="detail-section__title">Special Conditions</div>
-              <div class="chips" *ngIf="getSpecialConditions(b).length; else noConditions">
-                <span class="chip chip--muted" *ngFor="let x of getSpecialConditions(b)">{{ x }}</span>
+              <div class="detail-section__title">Commercial &amp; Quote</div>
+              <div class="kv">
+                <div class="kv__row">
+                  <span class="kv__k">Quote Status</span>
+                  <span class="kv__v">{{ getQuoteStatusLabel(b) }}</span>
+                </div>
+                <div class="kv__row">
+                  <span class="kv__k">Expires</span>
+                  <span class="kv__v">{{ b.quote?.expiresAt || '-' }}</span>
+                </div>
+                <div class="kv__row">
+                  <span class="kv__k">Reviewed By</span>
+                  <span class="kv__v">{{ b.quote?.reviewedBy || '-' }}</span>
+                </div>
               </div>
-              <ng-template #noConditions>
-                <div class="detail-muted">No special conditions.</div>
-              </ng-template>
+
+              <div class="quote-notes-block" *ngIf="b.quote?.customerMessage || b.quote?.internalNotes">
+                <div class="detail-subsection__title">Quote Notes</div>
+                <div class="note-box" *ngIf="b.quote?.customerMessage">
+                  <strong>Customer Message:</strong> {{ b.quote?.customerMessage }}
+                </div>
+                <div class="note-box quote-note-box" *ngIf="b.quote?.internalNotes">
+                  <strong>Internal Notes:</strong> {{ b.quote?.internalNotes }}
+                </div>
+              </div>
             </div>
 
+            <!-- Panel 3 — Special Instructions (merge Notes + Conditions + Requests) -->
             <div class="detail-section detail-section--full">
-              <div class="detail-section__title">Pricing</div>
+              <div class="detail-section__title">Special Instructions</div>
+
+              <div class="detail-subsection" *ngIf="getCustomerNotes(b)">
+                <div class="detail-subsection__title">Customer Notes</div>
+                <div class="note-box">{{ getCustomerNotes(b) }}</div>
+              </div>
+              <div class="detail-muted detail-subsection" *ngIf="!getCustomerNotes(b)">No notes provided.</div>
+
+              <div class="detail-subsection">
+                <div class="detail-subsection__title">Special Conditions</div>
+                <div class="chips" *ngIf="getSpecialConditions(b).length; else noConditions">
+                  <span class="chip chip--muted" *ngFor="let x of getSpecialConditions(b)">{{ x }}</span>
+                </div>
+                <ng-template #noConditions>
+                  <div class="detail-muted">No special conditions.</div>
+                </ng-template>
+              </div>
+
+              <div class="detail-subsection" *ngIf="hasAnyCustomerOrDiscountInfo(b)">
+                <div class="detail-subsection__title">Customer Requests</div>
+                <div class="kv">
+                  <div class="kv__row">
+                    <span class="kv__k">First-Service Discount Requested</span>
+                    <span class="kv__v">{{ getFirstServiceDiscountRequestedLabel(b) }}</span>
+                  </div>
+                  <div class="kv__row">
+                    <span class="kv__k">First-Service Discount Applied</span>
+                    <span class="kv__v">{{ getFirstServiceDiscountAppliedLabel(b) }}</span>
+                  </div>
+                  <div class="kv__row" *ngIf="getTripleDiscountTypeDisplay(b)">
+                    <span class="kv__k">Discount Type</span>
+                    <span class="kv__v">{{ getTripleDiscountTypeDisplay(b) }}</span>
+                  </div>
+                  <div class="kv__row" *ngIf="getTripleDiscountAmount(b) !== null">
+                    <span class="kv__k">Discount Amount</span>
+                    <span class="kv__v">-{{ getTripleDiscountAmount(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                  </div>
+                  <div class="kv__row">
+                    <span class="kv__k">Pets at Home</span>
+                    <span class="kv__v">{{ getPetsAtHomeLabel(b) }}</span>
+                  </div>
+                  <div class="kv__row" *ngIf="getPetSafetyNotes(b)">
+                    <span class="kv__k">Pet Safety Notes</span>
+                    <span class="kv__v kv__v--wrap">{{ getPetSafetyNotes(b) }}</span>
+                  </div>
+                  <div class="kv__row">
+                    <span class="kv__k">Customer Uses Own Cleaning Products</span>
+                    <span class="kv__v">{{ getUsesOwnProductsLabel(b) }}</span>
+                  </div>
+                  <div class="kv__row" *ngIf="getCleaningProductNotes(b)">
+                    <span class="kv__k">Cleaning Product Instructions</span>
+                    <span class="kv__v kv__v--wrap">{{ getCleaningProductNotes(b) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Panel 4 — Pricing Breakdown -->
+            <div class="detail-section detail-section--full">
+              <div class="detail-section__title">Pricing Breakdown</div>
               <div class="price-table">
                 <div class="price-row" *ngFor="let row of getPricingItems(b)">
                   <span class="price-row__label">{{ row.label }}</span>
                   <span class="price-row__amount">{{ row.amount | currency:'USD':'symbol':'1.2-2' }}</span>
                 </div>
                 <div class="price-total" *ngIf="getPricingTotal(b) !== null">
-                  <span class="price-total__label">Total</span>
+                  <span class="price-total__label">Line Items Total</span>
                   <span class="price-total__amount">{{ getPricingTotal(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                </div>
+                <div class="price-total price-total--highlight" *ngIf="getTripleFinalPrice(b) !== null">
+                  <span class="price-total__label">Final Admin-Approved Price</span>
+                  <span class="price-total__amount">{{ getTripleFinalPrice(b) | currency:'USD':'symbol':'1.2-2' }}</span>
                 </div>
               </div>
             </div>
+
+            <!-- Panel 5 — Payment & Links (ONE place for payment) -->
+            <div class="detail-section" *ngIf="b.paymentUrl || b.paymentLifecycleStatus">
+              <div class="detail-section__title">Payment &amp; Links</div>
+              <div class="kv">
+                <div class="kv__row">
+                  <span class="kv__k">Payment Status</span>
+                  <span class="kv__v">
+                    <span class="status-badge status-badge--legacy" *ngIf="!b.paymentLifecycleStatus">Legacy / N/A</span>
+                    <ng-container *ngIf="b.paymentLifecycleStatus">{{ getPaymentLifecycleLabel(b) }}</ng-container>
+                  </span>
+                </div>
+              </div>
+              <div class="payment-actions" *ngIf="b.paymentUrl">
+                <a
+                  class="btn btn--ghost btn--primary-ghost"
+                  [href]="b.paymentUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >Open in Stripe</a>
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  (click)="copyPaymentLinkToClipboard(b)"
+                >
+                  {{ copyPaymentLinkSuccessByBookingId[b._id] ? 'Copied ✓' : 'Copy link' }}
+                </button>
+              </div>
+              <div class="payment-actions-feedback">
+                <div class="banner banner--success banner--compact" *ngIf="copyPaymentLinkSuccessByBookingId[b._id]">Payment link copied to clipboard.</div>
+                <div class="banner banner--error banner--compact" *ngIf="copyPaymentLinkErrorByBookingId[b._id]">Unable to copy link to clipboard.</div>
+              </div>
+            </div>
+
+            <!-- Panel 6 — Manual Adjustments -->
+            <div class="detail-section" *ngIf="getQuoteManualAdjustments(b).length">
+              <div class="detail-section__title">Manual Adjustments</div>
+              <div class="chips">
+                <span class="chip chip--muted" *ngFor="let item of getQuoteManualAdjustments(b)">
+                  {{ item.label }} · {{ item.type }} · {{ item.amount | currency:'USD':'symbol':'1.2-2' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Panel 7 — Technical / Audit Details (collapsible secondary) -->
+            <details class="collapsible collapsible--audit detail-section detail-section--full">
+              <summary class="collapsible__summary">
+                <span class="collapsible__title">Technical / Audit Details</span>
+                <span class="collapsible__meta">Support &amp; debugging</span>
+              </summary>
+              <div class="collapsible__content">
+
+                <div class="audit-grid">
+                  <div class="audit-block">
+                    <div class="audit-block__title">Quote Audit</div>
+                    <div class="kv">
+                      <div class="kv__row">
+                        <span class="kv__k">Quote Version</span>
+                        <span class="kv__v">{{ getQuoteVersion(b) || '-' }}</span>
+                      </div>
+                      <div class="kv__row">
+                        <span class="kv__k">Quote Expires</span>
+                        <span class="kv__v">{{ b.quote?.expiresAt || '-' }}</span>
+                      </div>
+                      <div class="kv__row">
+                        <span class="kv__k">Reviewed By</span>
+                        <span class="kv__v">{{ b.quote?.reviewedBy || '-' }}</span>
+                      </div>
+                      <div class="kv__row">
+                        <span class="kv__k">Calculated Price</span>
+                        <span class="kv__v">{{ getTripleCalculatedPrice(b) !== null ? (getTripleCalculatedPrice(b) | currency:'USD':'symbol':'1.2-2') : '-' }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getTripleDiscountAmount(b) !== null">
+                        <span class="kv__k">Discount</span>
+                        <span class="kv__v">-{{ getTripleDiscountAmount(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getTripleDiscountTypeDisplay(b)">
+                        <span class="kv__k">Discount Type</span>
+                        <span class="kv__v">{{ getTripleDiscountTypeDisplay(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getTripleFinalQuoteAmount(b) !== null">
+                        <span class="kv__k">Final Quote</span>
+                        <span class="kv__v">{{ getTripleFinalQuoteAmount(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="kv__row">
+                        <span class="kv__k">Final Admin-Approved Price</span>
+                        <span class="kv__v">{{ getTripleFinalPrice(b) !== null ? (getTripleFinalPrice(b) | currency:'USD':'symbol':'1.2-2') : '-' }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="audit-block" *ngIf="hasExhaustiveFields(b)">
+                    <div class="audit-block__title">Exhaustive Property &amp; Service Details (FR-12)</div>
+                    <div class="kv">
+                      <div class="kv__row" *ngIf="getBedroomsCount(b) !== null">
+                        <span class="kv__k">Bedrooms</span>
+                        <span class="kv__v">{{ getBedroomsCount(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getBathroomsCount(b) !== null">
+                        <span class="kv__k">Bathrooms</span>
+                        <span class="kv__v">{{ getBathroomsCount(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getAdditionalBedroomsCount(b) !== null">
+                        <span class="kv__k">Additional Bedrooms</span>
+                        <span class="kv__v">+{{ getAdditionalBedroomsCount(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getSpecialServiceId(b)">
+                        <span class="kv__k">Special Service ID</span>
+                        <span class="kv__v kv__v--wrap">{{ getSpecialServiceId(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getRegularPackageId(b)">
+                        <span class="kv__k">Regular Package ID</span>
+                        <span class="kv__v kv__v--wrap">{{ getRegularPackageId(b) }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getBorderlineFee(b) !== null">
+                        <span class="kv__k">Borderline Fee</span>
+                        <span class="kv__v">+{{ getBorderlineFee(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="kv__row" *ngIf="getBookingNotes(b)">
+                        <span class="kv__k">Booking Notes</span>
+                        <span class="kv__v kv__v--wrap">{{ getBookingNotes(b) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="audit-block audit-block--full" *ngIf="getQuoteManualAdjustments(b).length || hasPriceAudit(b)">
+                    <div class="audit-block__title">Pricing &amp; Adjustments Audit</div>
+                    <div class="chips" *ngIf="getQuoteManualAdjustments(b).length">
+                      <span class="chip chip--muted" *ngFor="let item of getQuoteManualAdjustments(b)">
+                        {{ item.label }} · {{ item.type }} · {{ item.amount | currency:'USD':'symbol':'1.2-2' }}
+                        <ng-container *ngIf="item.reason"> · {{ item.reason }}</ng-container>
+                      </span>
+                    </div>
+                    <div class="price-table price-table--audit" *ngIf="hasPriceAudit(b)">
+                      <div class="price-row">
+                        <span class="price-row__label">Calculated Price</span>
+                        <span class="price-row__amount">{{ getTripleCalculatedPrice(b) !== null ? (getTripleCalculatedPrice(b) | currency:'USD':'symbol':'1.2-2') : '-' }}</span>
+                      </div>
+                      <div class="price-row" *ngIf="getTripleDiscountAmount(b) !== null">
+                        <span class="price-row__label">Discount</span>
+                        <span class="price-row__amount price-row__amount--discount">-{{ getTripleDiscountAmount(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="price-row" *ngIf="getTripleDiscountTypeDisplay(b)">
+                        <span class="price-row__label">Discount Type</span>
+                        <span class="price-row__amount">{{ getTripleDiscountTypeDisplay(b) }}</span>
+                      </div>
+                      <div class="price-row" *ngIf="getTripleFinalQuoteAmount(b) !== null">
+                        <span class="price-row__label">Final Quote</span>
+                        <span class="price-row__amount">{{ getTripleFinalQuoteAmount(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                      <div class="price-total price-total--highlight" *ngIf="getTripleFinalPrice(b) !== null">
+                        <span class="price-total__label">Final Admin-Approved Price</span>
+                        <span class="price-total__amount">{{ getTripleFinalPrice(b) | currency:'USD':'symbol':'1.2-2' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </details>
+
           </div>
         </div>
       </article>
     </section>
+
+    <!-- ============================================================ -->
+    <!-- Admin: Soft Cancel Booking Modal                              -->
+    <!-- ============================================================ -->
+    <div class="modal-backdrop" *ngIf="cancelModalOpen" (click)="closeCancelModal()">
+      <div class="modal modal--sm" (click)="$event.stopPropagation()">
+        <div class="modal__header">
+          <div class="modal__title">Cancel Booking</div>
+          <button type="button" class="modal__close" (click)="closeCancelModal()" aria-label="Close">×</button>
+        </div>
+        <div class="modal__body">
+          <div class="helper-text helper-text--small helper-text--warn" *ngIf="cancelTargetBookingId">
+            This will cancel the booking. Status will become <strong>Cancelled</strong> (soft, history preserved), commercial will be <strong>Quote Rejected</strong> and payment lifecycle <strong>Voided</strong>. Customer will be emailed.
+          </div>
+          <div class="assign-row" style="margin-top: 16px;">
+            <div class="assign-row__col">
+              <div class="assign-row__label">Cancellation Reason (visible in audit)</div>
+              <input
+                class="assign-row__select"
+                type="text"
+                maxlength="500"
+                placeholder="e.g. Customer requested by phone"
+                [(ngModel)]="cancelForm.cancellationReason"
+                [disabled]="cancelSubmitting"
+              />
+            </div>
+            <div class="assign-row__col">
+              <div class="assign-row__label">Internal Notes (private)</div>
+              <textarea
+                class="quote-editor__textarea"
+                rows="2"
+                maxlength="1000"
+                placeholder="Internal context for the cancellation"
+                [(ngModel)]="cancelForm.internalNotes"
+                [disabled]="cancelSubmitting"
+              ></textarea>
+            </div>
+          </div>
+          <div class="banner banner--error banner--compact" *ngIf="cancelError">{{ cancelError }}</div>
+        </div>
+        <div class="modal__footer">
+          <button type="button" class="btn btn--ghost" (click)="closeCancelModal()" [disabled]="cancelSubmitting">
+            Cancel Action
+          </button>
+          <button
+            type="button"
+            class="btn btn--cancel"
+            (click)="submitCancel()"
+            [disabled]="cancelSubmitting || !cancelTargetBookingId"
+          >
+            {{ cancelSubmitting ? 'Cancelling Booking…' : 'Confirm Cancel Booking' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Admin: Permanent Delete Booking Modal (Re-Authentication)    -->
+    <!-- ============================================================ -->
+    <div class="modal-backdrop" *ngIf="deleteModalOpen" (click)="closeDeleteModal()">
+      <div class="modal modal--sm" (click)="$event.stopPropagation()">
+        <div class="modal__header">
+          <div class="modal__title modal__title--danger">⚠ PERMANENTLY DELETE BOOKING</div>
+          <button type="button" class="modal__close" (click)="closeDeleteModal()" aria-label="Close">×</button>
+        </div>
+        <div class="modal__body">
+          <div class="banner banner--error banner--compact" *ngIf="deleteTargetBookingId">
+            DESTRUCTIVE ACTION — This cannot be undone.<br />
+            The booking and all its associated Payment records will be permanently erased from MongoDB.
+          </div>
+          <div class="helper-text helper-text--small" style="margin-top: 12px;">
+            As an additional safety measure, you must <strong>re-authenticate</strong> with your
+            Admin email and password below. Both your JWT session and these credentials will be
+            validated server-side via bcrypt against the <code>users</code> collection.
+          </div>
+          <div class="assign-row" style="margin-top: 16px;">
+            <div class="assign-row__col">
+              <div class="assign-row__label">Admin Email</div>
+              <input
+                class="assign-row__select"
+                type="email"
+                autocomplete="email"
+                placeholder="admin@zcleanup.com"
+                [(ngModel)]="deleteForm.email"
+                [disabled]="deleteSubmitting"
+              />
+            </div>
+            <div class="assign-row__col">
+              <div class="assign-row__label">Admin Password</div>
+              <input
+                class="assign-row__select"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Enter admin password"
+                [(ngModel)]="deleteForm.password"
+                [disabled]="deleteSubmitting"
+              />
+            </div>
+          </div>
+          <div class="banner banner--error banner--compact" *ngIf="deleteError">{{ deleteError }}</div>
+        </div>
+        <div class="modal__footer">
+          <button type="button" class="btn btn--ghost" (click)="closeDeleteModal()" [disabled]="deleteSubmitting">
+            Cancel Action
+          </button>
+          <button
+            type="button"
+            class="btn btn--danger"
+            (click)="submitDelete()"
+            [disabled]="deleteSubmitting || !deleteTargetBookingId"
+          >
+            {{ deleteSubmitting ? 'Permanently Deleting…' : 'PERMANENTLY DELETE BOOKING' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>

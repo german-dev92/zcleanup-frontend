@@ -7,7 +7,9 @@
     <script>
       (function () {
         var l = window.location;
-        var basePath = '/zcleanup-frontend/';
+        var basePath = l.pathname.startsWith('/zcleanup-frontend/')
+          ? '/zcleanup-frontend/'
+          : '/';
         var restPath =
           l.pathname.slice(basePath.length).replace(/^\/+/, '') || '';
         var search = l.search ? l.search.slice(1) : '';

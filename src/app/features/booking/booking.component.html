@@ -1,15 +1,23 @@
 <div class="booking-page container">
   <div class="booking-container">
     <div class="booking-header">
-      <h1>Book Your Cleaning</h1>
-      <p>Fill out the form below to request a professional cleaning service.</p>
+      <h1>{{ isPublicQuoteRequestMode ? 'Request Your Cleaning Quote' : 'Book Your Cleaning' }}</h1>
+      <p>
+        {{
+          isPublicQuoteRequestMode
+            ? 'Fill out the form below to request a personalized quote for your cleaning service.'
+            : 'Fill out the form below to request a professional cleaning service.'
+        }}
+      </p>
     </div>
 
     <div *ngIf="submitSuccess" class="alert alert-success">
       <p>{{ submitMessage }}</p>
       <p *ngIf="isRefreshingBookingStatus">Refreshing booking status...</p>
-      <p *ngIf="isWaitingForConfirmation">Waiting for admin confirmation.</p>
-      <ng-container *ngIf="!isAdminManualBooking">
+      <p *ngIf="isWaitingForConfirmation">
+        {{ isPublicQuoteRequestMode ? 'Our team is reviewing your request.' : 'Waiting for admin confirmation.' }}
+      </p>
+      <ng-container *ngIf="!isPublicQuoteRequestMode">
         <p *ngIf="paymentUiState === 'PENDING_PAYMENT'">Payment pending confirmation.</p>
         <p *ngIf="paymentUiState === 'PAYMENT_CONFIRMED'">Payment confirmed.</p>
         <p *ngIf="paymentUiState === 'PAYMENT_FAILED'">Payment failed.</p>
@@ -17,7 +25,7 @@
       </ng-container>
       <p *ngIf="submittedBookingStatus">{{ getStatusLabel(submittedBookingStatus) }}</p>
       <app-button
-        *ngIf="submittedBookingStatus === 'confirmed' && !isAdminManualBooking"
+        *ngIf="submittedBookingStatus === 'confirmed' && !isPublicQuoteRequestMode"
         type="button"
         variant="accent"
         size="small"
@@ -25,12 +33,737 @@
       >
         Proceed to Payment
       </app-button>
-      <app-button (btnClick)="submitSuccess = false; isWaitingForConfirmation = false" variant="outline" size="small">Book Another Service</app-button>
+      <app-button (btnClick)="startNewBooking()" variant="outline" size="small">
+        {{ isPublicQuoteRequestMode ? 'Request Another Quote' : 'Book Another Service' }}
+      </app-button>
     </div>
 
     <form *ngIf="!submitSuccess" [formGroup]="bookingForm" (ngSubmit)="onSubmit()" class="booking-form">
       <div class="booking-card" id="booking-form">
-        <div class="booking-form-grid">
+
+        <!-- ============================================================
+             [V2] STEPPED FLOW (useV2Model = true) — diseño guiado 1-9
+             ============================================================ -->
+        <ng-container *ngIf="useV2Model && selectedService" class="v2-form-wrapper">
+
+          <div class="v2-form">
+
+            <!-- ==========================================================
+                 STEP 1 — Customer Information
+                 ========================================================== -->
+            <section class="v2-section v2-focusable" aria-labelledby="v2-step1-title">
+              <header class="v2-section__header">
+                <div class="v2-section__header-num">1</div>
+                <div class="v2-section__header-titles">
+                  <h2 id="v2-step1-title">Customer Information</h2>
+                  <p>Contact details so we can reach you about your booking.</p>
+                </div>
+              </header>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="name">Full Name <span aria-hidden="true" style="color:#c0392b;">*</span></label>
+                  <input type="text" id="name" formControlName="name" placeholder="John Doe" maxlength="60" autocomplete="name" [class.invalid]="isFieldInvalid('name')" class="v2-focusable">
+                  <div *ngIf="isFieldInvalid('name')" class="error-msg" role="alert">Name is required (min 3 chars).</div>
+                </div>
+                <div class="form-group">
+                  <label for="email">Email Address <span aria-hidden="true" style="color:#c0392b;">*</span></label>
+                  <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')" class="v2-focusable">
+                  <div *ngIf="isFieldInvalid('email')" class="error-msg" role="alert">A valid email is required.</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Phone Number <em style="font-weight:400;color:#7b8a98;">(optional)</em></label>
+                <input type="tel" id="phone" formControlName="phone" placeholder="8135550123" maxlength="10" inputmode="numeric" autocomplete="tel" [class.invalid]="isFieldInvalid('phone')" class="v2-focusable">
+                <div *ngIf="isFieldInvalid('phone')" class="error-msg" role="alert">Phone number must be exactly 10 digits (US format, no +1).</div>
+              </div>
+            </section>
+
+            <!-- ==========================================================
+                 STEP 2 — Address & Coverage
+                 ========================================================== -->
+            <section class="v2-section v2-section--info v2-focusable" aria-labelledby="v2-step2-title">
+              <header class="v2-section__header">
+                <div class="v2-section__header-num">2</div>
+                <div class="v2-section__header-titles">
+                  <h2 id="v2-step2-title">Address &amp; Coverage</h2>
+                  <p>Service area is boundary-based. We'll verify coverage automatically.</p>
+                </div>
+              </header>
+
+              <div class="form-group">
+                <label for="address">Full Address <span aria-hidden="true" style="color:#c0392b;">*</span></label>
+                <div class="address-input-wrapper">
+                  <input type="text" id="address" formControlName="address" placeholder="123 Shine St, Tampa, FL" maxlength="160" autocomplete="street-address" [class.invalid]="isFieldInvalid('address')" class="v2-focusable">
+                  <button type="button" class="btn-location v2-focusable" (click)="useCurrentLocation()" title="Use my current location" [disabled]="isCheckingCoverage" aria-label="Use my current location">
+                    <i class="fas" [class.fa-location-crosshairs]="!isCheckingCoverage" [class.fa-spinner]="isCheckingCoverage" [class.fa-spin]="isCheckingCoverage"></i>
+                  </button>
+                </div>
+                <div *ngIf="isFieldInvalid('address')" class="error-msg" role="alert">Valid address is required (min 10 chars).</div>
+
+                <!-- [V2] Visual Coverage Status -->
+                <ng-container *ngIf="getV2CoverageState() !== 'UNAVAILABLE' || isCheckingCoverage || coverageMessage">
+                  <div
+                    class="v2-coverage"
+                    role="status"
+                    aria-live="polite"
+                    [class.is-loading]="getV2CoverageState() === 'LOADING' || isCheckingCoverage"
+                    [class.is-inside]="getV2CoverageState() === 'INSIDE'"
+                    [class.is-borderline]="getV2CoverageState() === 'BORDERLINE'"
+                    [class.is-outside]="getV2CoverageState() === 'OUTSIDE'"
+                  >
+                    <div class="v2-coverage__icon">
+                      <ng-container [ngSwitch]="getV2CoverageState()">
+                        <ng-template [ngSwitchCase]="'LOADING'"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i></ng-template>
+                        <ng-template [ngSwitchCase]="'INSIDE'"><span aria-hidden="true">✓</span></ng-template>
+                        <ng-template [ngSwitchCase]="'BORDERLINE'"><span aria-hidden="true">⚠</span></ng-template>
+                        <ng-template [ngSwitchCase]="'OUTSIDE'"><span aria-hidden="true">✕</span></ng-template>
+                        <ng-template ngSwitchDefault><span aria-hidden="true">ℹ</span></ng-template>
+                      </ng-container>
+                    </div>
+                    <div class="v2-coverage__body">
+                      <ng-container [ngSwitch]="getV2CoverageState()">
+                        <strong *ngSwitchCase="'INSIDE'">Inside service area</strong>
+                        <strong *ngSwitchCase="'BORDERLINE'">Borderline area</strong>
+                        <strong *ngSwitchCase="'OUTSIDE'">Outside service area</strong>
+                        <strong *ngSwitchCase="'LOADING'">Checking coverage…</strong>
+                        <strong *ngSwitchDefault>{{ hasVerifiedCoverage ? 'Address verified' : 'Address status' }}</strong>
+                      </ng-container>
+                      <small *ngIf="coverageMessage">{{ coverageMessage }}</small>
+                      <small *ngIf="getV2CoverageState() === 'BORDERLINE' && !coverageMessage">A small boundary surcharge applies (within &le;1 km outside the main zone).</small>
+                      <small *ngIf="getV2CoverageState() === 'INSIDE' && !coverageMessage">Standard booking pricing applies.</small>
+                      <small *ngIf="getV2CoverageState() === 'OUTSIDE' && !coverageMessage">Standard booking isn't available here. Try the Custom Quote route for evaluation or adjust the address.</small>
+                    </div>
+                    <div *ngIf="getV2CoverageFeeLabel()" class="v2-coverage__fee" aria-label="Borderline fee">
+                      {{ getV2CoverageFeeLabel() }}
+                    </div>
+                  </div>
+                </ng-container>
+
+                <div class="coverage-hint" *ngIf="!coverageMessage && !isCheckingCoverage">
+                  <small>Serving: {{ coverageCitiesList.join(', ') }} and nearby areas.</small>
+                </div>
+              </div>
+            </section>
+
+            <!-- ==========================================================
+                 STEP 3 — Schedule
+                 ========================================================== -->
+            <section class="v2-section v2-focusable" aria-labelledby="v2-step3-title">
+              <header class="v2-section__header">
+                <div class="v2-section__header-num">3</div>
+                <div class="v2-section__header-titles">
+                  <h2 id="v2-step3-title">Schedule</h2>
+                  <p>Pick your preferred date and 30-min time slot within the next 30 days.</p>
+                </div>
+              </header>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="desiredDate">Desired Date <span aria-hidden="true" style="color:#c0392b;">*</span></label>
+                  <input
+                    type="date"
+                    id="desiredDate"
+                    formControlName="desiredDate"
+                    [attr.min]="minBookingDate"
+                    [attr.max]="maxBookingDate"
+                    [class.invalid]="isFieldInvalid('desiredDate')"
+                    class="v2-focusable"
+                  >
+                  <div *ngIf="isFieldInvalid('desiredDate') && bookingForm.get('desiredDate')?.errors?.['required']" class="error-msg" role="alert">Please select a date.</div>
+                  <div *ngIf="isFieldInvalid('desiredDate') && (bookingForm.get('desiredDate')?.errors?.['pastDate'] || bookingForm.get('desiredDate')?.errors?.['invalidDateFormat'])" class="error-msg" role="alert">Select a valid future date.</div>
+                  <div *ngIf="isFieldInvalid('desiredDate') && bookingForm.get('desiredDate')?.errors?.['dateTooFar']" class="error-msg" role="alert">Please select a date within the next year.</div>
+                </div>
+
+                <div class="form-group">
+                  <label for="desiredTime">Desired Time <span aria-hidden="true" style="color:#c0392b;">*</span></label>
+                  <div class="select-wrapper">
+                    <select id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')" class="rich-select v2-focusable" aria-label="Desired time slot">
+                      <option value="" disabled>Choose a time slot…</option>
+                      <option *ngFor="let t of allowedTimes" [value]="t">{{ t }}</option>
+                    </select>
+                    <div class="select-arrow" aria-hidden="true"></div>
+                  </div>
+                  <small class="helper-text">30-minute slots between 08:00 – 17:00.</small>
+                  <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['required']" class="error-msg" role="alert">Please select a time slot.</div>
+                  <div *ngIf="isFieldInvalid('desiredTime') && desiredTimeControl?.errors?.['invalidTimeSlot']" class="error-msg" role="alert">Please choose a valid time slot.</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Wrap rest with coverage disabled overlay -->
+            <div
+              class="booking-details-wrapper"
+              [class.disabled-overlay]="getV2CoverageState() === 'OUTSIDE' && !isCheckingCoverage"
+            >
+              <div class="coverage-blocker" *ngIf="getV2CoverageState() === 'OUTSIDE' && !isCheckingCoverage && (bookingForm.get('address')?.value ?? '').length >= 10" role="alert" aria-live="assertive">
+                <div class="blocker-content">
+                  <i class="fas fa-map-location-dot"></i>
+                  <h3>Address Outside Service Area</h3>
+                  <p>This address is outside the standard coverage zone. You can still proceed with <strong>Custom Quote</strong> for evaluation, or adjust the address to continue with standard booking.</p>
+                </div>
+              </div>
+
+              <ng-container formGroupName="dynamicFields">
+                <!-- ==========================================================
+                     STEP 4 — Regular Cleaning (OBLIGATORIO)
+                     ========================================================== -->
+                <section class="v2-section v2-focusable" aria-labelledby="v2-step4-title">
+                  <header class="v2-section__header">
+                    <div class="v2-section__header-num">4</div>
+                    <div class="v2-section__header-titles">
+                      <h2 id="v2-step4-title">Regular Cleaning</h2>
+                      <p>The mandatory base service. Pick your home size, then add bedrooms if needed.</p>
+                    </div>
+                  </header>
+
+                  <div class="v2-regular__banner">
+                    <span class="v2-badge v2-badge--primary">Required base</span>
+                    <strong>Regular Cleaning is always included.</strong>
+                    <span>Special services (deep, move, post-construction, extreme) are optional add-ons applied on top.</span>
+                  </div>
+
+                  <!-- Regular Packages grid cards -->
+                  <div class="v2-regular__packages-grid" role="radiogroup" aria-label="Regular cleaning home size packages">
+                    <button
+                      type="button"
+                      *ngFor="let pkg of regularPackagesV2; trackBy: trackByV2RegularPackageId"
+                      class="v2-regular__package v2-focusable"
+                      role="radio"
+                      [attr.aria-checked]="(bookingForm.get('dynamicFields.regularPackageId')?.value === pkg.id) ? 'true' : 'false'"
+                      [class.is-selected]="bookingForm.get('dynamicFields.regularPackageId')?.value === pkg.id"
+                      (click)="selectV2RegularPackage(pkg.id)"
+                      [attr.aria-label]="pkg.label + ' — base price ' + pkg.basePrice + ' dollars'"
+                    >
+                      <div>
+                        <div class="v2-regular__package-label">Home size</div>
+                        <div class="v2-regular__package-config">
+                          <span class="v2-regular__package-beds">{{ pkg.bedrooms }}</span>
+                          <span>bed</span>
+                          <span aria-hidden="true">/</span>
+                          <span class="v2-regular__package-baths">{{ pkg.bathrooms }}</span>
+                          <span>bath</span>
+                        </div>
+                      </div>
+                      <div class="v2-regular__package-price">
+                        <strong>${{ pkg.basePrice }}</strong>
+                      </div>
+                    </button>
+                  </div>
+
+                  <!-- Additional Bedrooms counter -->
+                  <div class="v2-regular__add-bed">
+                    <div class="v2-regular__add-bed-label">
+                      <strong>Additional Bedrooms</strong>
+                      <span>Needed for homes larger than the base configuration above.</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                      <span class="v2-regular__add-bed-price">+${{ v2ExtraBedroomPrice }} each</span>
+                      <div class="v2-counter" role="group" aria-label="Additional bedrooms counter">
+                        <button
+                          type="button"
+                          class="v2-counter__btn v2-focusable"
+                          aria-label="Decrease additional bedrooms"
+                          (click)="decrementV2AdditionalBedrooms()"
+                          [disabled]="v2AddBedroomsValue <= 0"
+                        >−</button>
+                        <span class="v2-counter__value" aria-live="polite">{{ v2AddBedroomsValue }}</span>
+                        <button
+                          type="button"
+                          class="v2-counter__btn v2-focusable"
+                          aria-label="Increase additional bedrooms"
+                          (click)="incrementV2AdditionalBedrooms()"
+                        >+</button>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ==========================================================
+                     STEP 5 — Special Service (0/1 single-select, CARDS)
+                     ========================================================== -->
+                <section class="v2-section v2-section--info v2-focusable" aria-labelledby="v2-step5-title">
+                  <header class="v2-section__header">
+                    <div class="v2-section__header-num">5</div>
+                    <div class="v2-section__header-titles">
+                      <h2 id="v2-step5-title">Special Services</h2>
+                      <p>Optional upgrades to your Regular Cleaning. Select one, or skip if you only need Regular Cleaning.</p>
+                    </div>
+                  </header>
+
+                  <div class="v2-special__grid" role="radiogroup" aria-label="Special add-on services (choose at most one)">
+                    <button
+                      type="button"
+                      *ngFor="let ss of specialServicesV2; trackBy: trackByV2SpecialServiceId"
+                      class="v2-special__card v2-focusable"
+                      role="radio"
+                      [attr.aria-checked]="(getV2SelectedSpecialServiceId() === ss.id) ? 'true' : 'false'"
+                      [class.is-selected]="getV2SelectedSpecialServiceId() === ss.id"
+                      (click)="selectV2SpecialService(ss.id)"
+                    >
+                      <div
+                        class="v2-special__card-img"
+                        role="img"
+                        [attr.aria-label]="ss.label + ' preview image'"
+                      >
+                        <img
+                          *ngIf="v2SpecialCardImages[ss.id]"
+                          [src]="v2SpecialCardImages[ss.id]"
+                          [alt]="ss.label + ' cover image'"
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                        >
+                        <div
+                          *ngIf="!v2SpecialCardImages[ss.id]"
+                          class="v2-special__card-img-fallback"
+                        ></div>
+                        <span class="v2-badge">+${{ ss.flatFee }}</span>
+                      </div>
+                      <div class="v2-special__card-body">
+                        <h3>{{ ss.label }}</h3>
+                        <p>{{ ss.shortDescription }}</p>
+                      </div>
+                      <div class="v2-special__card-footer">
+                        <button
+                          type="button"
+                          class="v2-special__card-footer-info v2-focusable"
+                          [attr.aria-label]="'View details for ' + ss.label"
+                          title="View details (included / not included)"
+                          (click)="$event.stopPropagation(); openSpecialServiceInfo(ss.id)"
+                        >ⓘ</button>
+                        <label class="v2-special__card-footer-radio">
+                          <input
+                            type="radio"
+                            name="v2SpecialServiceCard"
+                            [checked]="getV2SelectedSpecialServiceId() === ss.id"
+                            (change)="selectV2SpecialService(ss.id)"
+                          >
+                          Select
+                        </label>
+                      </div>
+                    </button>
+                  </div>
+
+                  <!-- Deselect option -->
+                  <div class="v2-special__none" *ngIf="getV2SelectedSpecialServiceId()">
+                    <span aria-hidden="true">✓</span>
+                    <span>
+                      <strong>{{ getDisplaySpecialServiceLabelV2(getV2SelectedSpecialServiceId()) }}</strong>
+                      is selected as your add-on.
+                      <button
+                        type="button"
+                        class="v2-focusable"
+                        style="background:none;border:0;text-decoration:underline;color:var(--secondary-color);font-weight:600;cursor:pointer;padding:0;font-size:inherit;"
+                        (click)="selectV2SpecialService(null)"
+                      >Remove Special Service</button>
+                    </span>
+                    <span class="v2-badge v2-badge--success">{{ getV2SelectedSpecialFeeLabel() }}</span>
+                  </div>
+                  <div class="v2-special__none" *ngIf="!getV2SelectedSpecialServiceId()">
+                    <span aria-hidden="true">✓</span>
+                    <strong>Just Regular Cleaning</strong> is fine. No special service selected — your booking remains valid.
+                  </div>
+                </section>
+
+                <!-- ==========================================================
+                     STEP 6 — Optional Extras (CARDS, COMPATIBILITY VISUAL)
+                     ========================================================== -->
+                <section class="v2-section v2-focusable" aria-labelledby="v2-step6-title">
+                  <header class="v2-section__header">
+                    <div class="v2-section__header-num">6</div>
+                    <div class="v2-section__header-titles">
+                      <h2 id="v2-step6-title">Optional Extras</h2>
+                      <p>Customize your visit. Availability depends on the Special Service above.</p>
+                    </div>
+                  </header>
+
+                  <div class="v2-extras__grid">
+                    <ng-container *ngFor="let extra of optionalExtrasV2; trackBy: trackByV2OptionalExtraId">
+                      <ng-container *ngIf="getV2ExtraVisualReason(extra.id) as visualReason">
+                        <div
+                          class="v2-extras__card v2-focusable"
+                          [class.is-selected]="isV2ExtraSelected(extra.id)"
+                          [class.is-disabled]="visualReason.kind !== null && !isV2ExtraSelected(extra.id)"
+                        >
+                          <div class="v2-extras__card-head">
+                            <div class="v2-extras__card-title">
+                              <h4>{{ extra.label }}</h4>
+                              <span class="v2-extras__card-title-helper" *ngIf="extra.helperLabel">Subject to availability</span>
+                            </div>
+                            <div class="v2-extras__card-price">
+                              <ng-container *ngIf="extra.kind === 'qty'">
+                                ${{ extra.unitPrice }}/{{ extra.unitLabel || 'unit' }}
+                              </ng-container>
+                              <ng-container *ngIf="extra.kind !== 'qty'">
+                                ${{ extra.unitPrice }}
+                              </ng-container>
+                              <button
+                                type="button"
+                                class="v2-extras__info-btn v2-focusable"
+                                (click)="openExtraInfoModal(extra.id)"
+                                [attr.aria-label]="'More information about extra ' + extra.label"
+                                title="More information"
+                              >ⓘ</button>
+                            </div>
+                          </div>
+
+                          <!-- Short description (debajo price/header, visible) -->
+                          <p class="v2-extras__card-short" *ngIf="extra.shortDescription">{{ extra.shortDescription }}</p>
+
+                          <!-- Alt labels (Garage mutuo, Laundry max, Outside window $7/win) -->
+                          <div class="v2-extras__card-alt-label" *ngIf="getV2ExtraAltLabel(extra.id) && !visualReason.kind">
+                            {{ getV2ExtraAltLabel(extra.id) }}
+                          </div>
+
+                          <!-- Incompatibility reason badge COLOR-CODED -->
+                          <div
+                            *ngIf="visualReason.kind"
+                            class="v2-extras__card-reason"
+                            [class.is-included]="visualReason.kind === 'included'"
+                            [class.is-notcompatible]="visualReason.kind === 'notcompatible'"
+                            [class.is-excluded]="visualReason.kind === 'excluded'"
+                            role="note"
+                          >
+                            <ng-container [ngSwitch]="visualReason.kind">
+                              <span *ngSwitchCase="'included'" aria-hidden="true">✓</span>
+                              <span *ngSwitchCase="'notcompatible'" aria-hidden="true">⊘</span>
+                              <span *ngSwitchCase="'excluded'" aria-hidden="true">!</span>
+                            </ng-container>
+                            {{ visualReason.text }}
+                          </div>
+
+                          <!-- Controls -->
+                          <div class="v2-extras__card-ctrl">
+                            <label class="checkbox-label" style="margin:0;padding:0;border:0;background:transparent;">
+                              <input
+                                type="checkbox"
+                                [checked]="isV2ExtraSelected(extra.id)"
+                                [disabled]="visualReason.kind !== null && !isV2ExtraSelected(extra.id)"
+                                (change)="onV2ExtraBoolToggle(extra.id, $any($event.target).checked)"
+                                class="v2-focusable"
+                                [attr.aria-label]="'Select extra ' + extra.label"
+                              >
+                              <span style="font-weight:600;color:var(--primary-color);">Add</span>
+                            </label>
+
+                            <!-- Quantity based extras (Laundry / Outside Window) -->
+                            <ng-container *ngIf="extra.kind === 'qty' && isV2ExtraSelected(extra.id)">
+                              <div class="v2-counter" role="group" [attr.aria-label]="'Quantity for ' + extra.label">
+                                <button
+                                  type="button"
+                                  class="v2-counter__btn v2-focusable"
+                                  [attr.aria-label]="'Decrease ' + extra.label + ' quantity'"
+                                  (click)="decrementV2ExtraQtyButton(extra.id)"
+                                  [disabled]="(getV2ExtraQty(extra.id) || (extra.minQuantity || 1)) <= (extra.minQuantity || 1)"
+                                >−</button>
+                                <span class="v2-counter__value" aria-live="polite">
+                                  {{ getV2ExtraQty(extra.id) || (extra.minQuantity || 1) }}
+                                </span>
+                                <button
+                                  type="button"
+                                  class="v2-counter__btn v2-focusable"
+                                  [attr.aria-label]="'Increase ' + extra.label + ' quantity'"
+                                  (click)="incrementV2ExtraQtyButton(extra.id)"
+                                  [disabled]="!!extra.maxQuantity && getV2ExtraQty(extra.id) >= extra.maxQuantity"
+                                >+</button>
+                              </div>
+                              <small style="font-size:.75rem;color:#7b8a98;" *ngIf="extra.maxQuantity">max {{ extra.maxQuantity }} {{ extra.unitLabel || 'units' }}</small>
+                            </ng-container>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </ng-container>
+                  </div>
+                </section>
+              </ng-container>
+
+                <!-- ==========================================================
+                     STEP 7 — Service Notes / Special Conditions (NO FEE)
+                     ========================================================== -->
+                <section class="v2-section v2-section--notes v2-focusable" aria-labelledby="v2-step7-title">
+                  <header class="v2-section__header">
+                    <div class="v2-section__header-num">7</div>
+                    <div class="v2-section__header-titles">
+                      <h2 id="v2-step7-title">Service Notes / Special Conditions</h2>
+                      <p>Context for the team — they are informational and never change your price.</p>
+                    </div>
+                  </header>
+
+                  <div class="v2-notes">
+                    <div class="v2-notes__disclaimer">
+                      <span class="v2-notes__dollar">$0</span>
+                      <span>These options do not affect the price.</span>
+                    </div>
+
+                    <div class="v2-notes__list">
+                      <label class="checkbox-label v2-focusable">
+                        <input type="checkbox" formControlName="petsAtHome" class="v2-focusable">
+                        <div style="flex:1 1 auto;">
+                          <span class="v2-notes__lbl">{{ v2ServiceNotesLabels.petsAtHome }}</span>
+                          <span class="v2-notes__hlp">{{ v2ServiceNotesLabels.petsAtHomeHelper }}</span>
+                        </div>
+                      </label>
+
+                      <ng-container *ngIf="petsAtHomeControl?.value">
+                        <div style="margin-left:2.2rem;margin-top:.6rem;">
+                          <div>
+                            <label class="v2-notes__q-label" style="display:block;margin-bottom:.3rem;font-weight:600;">
+                              {{ v2ServiceNotesLabels.petsQuestion }}
+                            </label>
+                            <p style="margin:0 0 .5rem;color:var(--text-muted);font-size:.85rem;line-height:1.4;">
+                              {{ v2ServiceNotesLabels.petsQuestionHelper }}
+                            </p>
+                            <textarea
+                              rows="3"
+                              class="v2-input v2-input--textarea"
+                              formControlName="petSafetyNotes"
+                              style="width:100%;padding:.75rem;border-radius:8px;"
+                              [attr.placeholder]="v2ServiceNotesLabels.petsPlaceholder"
+                              aria-label="Pet safety precautions"
+                            ></textarea>
+                          </div>
+
+                          <div class="v2-notes__safety" style="margin-top:1rem;padding:.85rem 1rem;border-radius:10px;background:linear-gradient(135deg,#fff9c4 0%,#fff59d 100%);border:1px solid #fbc02d;box-shadow:0 1px 3px rgba(251,192,45,.15);">
+                            <strong style="color:#795548;display:block;margin-bottom:.3rem;">
+                              ⚠️ {{ v2ServiceNotesLabels.petsSafetyTitle }}
+                            </strong>
+                            <p style="margin:0;color:#4e342e;font-size:.86rem;line-height:1.5;">
+                              {{ v2ServiceNotesLabels.petsSafetyText }}
+                            </p>
+                          </div>
+                        </div>
+                      </ng-container>
+
+                      <label class="checkbox-label v2-focusable" style="margin-top:1.2rem;">
+                        <input type="checkbox" formControlName="useOwnProducts" class="v2-focusable">
+                        <div style="flex:1 1 auto;">
+                          <span class="v2-notes__lbl">{{ v2ServiceNotesLabels.useOwnProducts }}</span>
+                          <span class="v2-notes__hlp">{{ v2ServiceNotesLabels.useOwnProductsHelper }}</span>
+                        </div>
+                      </label>
+
+                      <ng-container *ngIf="useOwnProductsControl?.value">
+                        <div style="margin-left:2.2rem;margin-top:.6rem;">
+                          <div>
+                            <label class="v2-notes__q-label" style="display:block;margin-bottom:.3rem;font-weight:600;">
+                              {{ v2ServiceNotesLabels.productsQuestion }}
+                            </label>
+                            <p style="margin:0 0 .5rem;color:var(--text-muted);font-size:.85rem;line-height:1.4;">
+                              {{ v2ServiceNotesLabels.productsQuestionHelper }}
+                            </p>
+                            <textarea
+                              rows="4"
+                              class="v2-input v2-input--textarea"
+                              formControlName="cleaningProductNotes"
+                              style="width:100%;padding:.75rem;border-radius:8px;"
+                              [attr.placeholder]="v2ServiceNotesLabels.productsPlaceholder"
+                              aria-label="Customer cleaning products instructions"
+                            ></textarea>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- ==========================================================
+                     STEP 8 — Custom Quote / Solicitud Especial
+                     ========================================================== -->
+                <section class="v2-custom v2-focusable" aria-labelledby="v2-step8-title">
+                  <div class="v2-custom__info">
+                    <h3 id="v2-step8-title">
+                      <span aria-hidden="true">✨</span>
+                      {{ v2CustomQuoteMenuLabel }}
+                    </h3>
+                    <p>Need something outside the standard catalog? This is the right path for partial cleanings, unusual requests, post-construction partial work, single-room services, one-bathroom, or anything that needs evaluation.</p>
+                    <ul class="v2-custom__list">
+                      <li>Partial cleanings / selective rooms</li>
+                      <li>Unusual or complex requests</li>
+                      <li>Requests outside the standard service catalog</li>
+                      <li>Partial post-construction or remodeling cleanup</li>
+                      <li>One-room / one-bathroom / one-area services</li>
+                      <li>Other requests requiring personal evaluation</li>
+                    </ul>
+                  </div>
+                  <div class="v2-custom__cta">
+                    <app-button
+                      type="button"
+                      variant="accent"
+                      size="large"
+                      (btnClick)="navigateToCustomQuote()"
+                    >Open {{ v2CustomQuoteMenuLabel }}</app-button>
+                  </div>
+                </section>
+
+                <!-- ==========================================================
+                     STEP 9 — Price / Request Summary + Submit
+                     ========================================================== -->
+                <section class="v2-section v2-section--summary v2-focusable" aria-labelledby="v2-step9-title">
+                  <header class="v2-section__header">
+                    <div class="v2-section__header-num">9</div>
+                    <div class="v2-section__header-titles">
+                      <h2 id="v2-step9-title">Price / Request Summary</h2>
+                      <p>Component breakdown. Click Check Coverage &amp; Estimate to refresh numbers.</p>
+                    </div>
+                  </header>
+
+                  <!-- Discount + Estimate actions (shared V1/V2 flags, solo visuales aquí) -->
+                  <div style="margin-bottom:1.25rem;">
+                    <div class="checkbox-group">
+                      <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
+                        <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This address already used the first-time discount' : null">
+                          <input type="checkbox" formControlName="applyFirstDiscount" class="v2-focusable">
+                          <div style="flex:1 1 auto;">
+                            <span style="font-weight:600;">{{ v2ServiceNotesLabels.firstTimeDiscountLabel }}</span>
+                            <span style="display:block;margin-top:.2rem;color:var(--text-muted);font-size:.86rem;line-height:1.4;">
+                              {{ v2ServiceNotesLabels.firstTimeDiscountHelper }}
+                            </span>
+                            <span style="display:block;margin-top:.35rem;color:#388e3c;font-weight:500;font-size:.84rem;">
+                              ℹ️ {{ v2ServiceNotesLabels.firstTimeDiscountInfoText }}
+                            </span>
+                          </div>
+                        </label>
+                        <span
+                          class="discount-option__info v2-focusable"
+                          tabindex="0"
+                          role="tooltip"
+                          *ngIf="isDiscountBlocked"
+                          [attr.data-tooltip]="discountCheckMessage || 'This address already used the first-time discount'"
+                          aria-label="Discount availability info"
+                        >i</span>
+                      </div>
+                      <div class="price-note" *ngIf="isCheckingDiscount">Checking discount eligibility…</div>
+                      <div class="price-note" *ngIf="discountCheckMessage">{{ discountCheckMessage }}</div>
+                      <div class="price-note">Discount review is performed by the team per household/address.</div>
+                    </div>
+
+                    <div style="margin-top:1rem;">
+                      <app-button
+                        type="button"
+                        variant="outline"
+                        size="small"
+                        (btnClick)="requestCoverageEstimate()"
+                        [disabled]="!canRequestCoverageEstimate"
+                      >Check Coverage &amp; Estimate</app-button>
+                    </div>
+                  </div>
+
+                  <!-- Summary breakdown rows -->
+                  <div class="v2-summary">
+                    <div class="v2-summary__rows" *ngIf="hasPricePreviewData">
+                      <div class="v2-summary__row">
+                        <div class="v2-summary__row-label">
+                          Regular Cleaning
+                          <small *ngIf="getSelectedV2RegularPackage()">
+                            {{ getDisplayRegularPackageLabelV2(getSelectedV2RegularPackage()?.id) }}
+                          </small>
+                        </div>
+                        <div class="v2-summary__row-val">${{ getV2BaseServicePrice() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row" *ngIf="v2AddBedroomsValue > 0 || getV2AdditionalBedroomsFee() > 0">
+                        <div class="v2-summary__row-label">
+                          Additional Bedrooms
+                          <small>
+                            <ng-container *ngIf="v2AddBedroomsValue > 0">
+                              {{ v2AddBedroomsValue }} × +${{ v2ExtraBedroomPrice }}
+                            </ng-container>
+                            <ng-container *ngIf="v2AddBedroomsValue <= 0">0 rooms</ng-container>
+                          </small>
+                        </div>
+                        <div class="v2-summary__row-val">${{ getV2AdditionalBedroomsFee() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row" *ngIf="getV2SelectedSpecialServiceId()">
+                        <div class="v2-summary__row-label">
+                          Special Service
+                          <small>{{ getDisplaySpecialServiceLabelV2(getV2SelectedSpecialServiceId()) }}</small>
+                        </div>
+                        <div class="v2-summary__row-val">+${{ getV2SpecialServiceFee() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row" *ngIf="getV2ExtrasTotalFee() > 0 || getV2ExtrasSelectedListLabels().length > 0">
+                        <div class="v2-summary__row-label">
+                          Optional Extras
+                          <small class="v2-summary__extras-list" *ngIf="getV2ExtrasSelectedListLabels().length">
+                            {{ getV2ExtrasSelectedListLabels().join(', ') }}
+                          </small>
+                        </div>
+                        <div class="v2-summary__row-val">${{ getV2ExtrasTotalFee() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row" *ngIf="getV2BorderlineFee() > 0 || getV2CoverageState() === 'BORDERLINE'">
+                        <div class="v2-summary__row-label">
+                          Borderline Fee
+                          <small>Boundary surcharge &le;1 km outside main zone</small>
+                        </div>
+                        <div class="v2-summary__row-val">${{ getV2BorderlineFee() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row" *ngIf="getV2DiscountAmount() > 0">
+                        <div class="v2-summary__row-label">
+                          First-service discount
+                          <small>Applied over base + additional bedrooms only</small>
+                        </div>
+                        <div class="v2-summary__row-val" style="color:#1e8449;">−${{ getV2DiscountAmount() }}</div>
+                      </div>
+
+                      <div class="v2-summary__row">
+                        <div class="v2-summary__row-label">
+                          Service Notes
+                          <small>Pets at home · Own products — informational only</small>
+                        </div>
+                        <div class="v2-summary__row-val">$0</div>
+                      </div>
+                    </div>
+
+                    <!-- Estimated Price gradient card -->
+                    <div class="v2-summary__estimated" *ngIf="hasPricePreviewData || (useV2Model && getV2LocalEstimatedPrice() !== null); else noPricePreview">
+                      <div class="v2-summary__estimated-label">
+                        <strong>Estimated Price</strong>
+                        <small *ngIf="hasPricePreviewData">*Not final. Requires ZCLEANUP confirmation; conditions on-site may adjust the total.</small>
+                        <small *ngIf="!hasPricePreviewData && useV2Model">*Regular Cleaning base + additional bedrooms + selected special service only. Final total calculated after Check Coverage &amp; Estimate (extras, borderline, discount added later).</small>
+                      </div>
+                      <div class="v2-summary__estimated-price" *ngIf="hasPricePreviewData">${{ getV2EstimatedTotal() }}</div>
+                      <div class="v2-summary__estimated-price" *ngIf="!hasPricePreviewData && useV2Model && getV2LocalEstimatedPrice() !== null">${{ getV2LocalEstimatedPrice() }}</div>
+                    </div>
+                    <ng-template #noPricePreview>
+                      <div class="v2-summary__estimated" style="background:linear-gradient(135deg,#95a5a6 0%,#7f8c8d 100%);box-shadow:none;">
+                        <div class="v2-summary__estimated-label">
+                          <strong>No estimate yet</strong>
+                          <small>Select a home size (Regular Cleaning) to see a progressive base price; or fill in the address and click <em>Check Coverage &amp; Estimate</em> for the full calculation.</small>
+                        </div>
+                        <div class="v2-summary__estimated-price">—</div>
+                      </div>
+                    </ng-template>
+
+                    <div class="v2-summary__disclaimer">
+                      <strong>Heads up:</strong> This is an estimate, not a guaranteed final invoice. ZCLEANUP reviews every booking and may confirm or adjust pricing before dispatching the team. Pets, products, and service notes are free context for the cleaners.
+                    </div>
+                  </div>
+
+                  <!-- Submit Booking step -->
+                  <div class="form-actions" style="margin-top:1.5rem;">
+                    <app-button
+                      type="submit"
+                      size="large"
+                      [loading]="isSubmitting"
+                      [disabled]="bookingForm.invalid || isCheckingCoverage || isSubmitting"
+                    >
+                      {{ isPublicQuoteRequestMode ? 'Request Quote' : 'Submit Booking Request' }}
+                    </app-button>
+                  </div>
+                </section>
+            </div>
+          </div>
+        </ng-container>
+        <!-- /[V2] STEPPED FLOW -->
+
+        <!-- ============================================================
+             [LEGACY V1] Full 2-column layout (preserved intact)
+             ============================================================ -->
+        <div class="booking-form-grid" *ngIf="!useV2Model">
           <div class="booking-form-grid__contact">
             <div class="form-row">
               <div class="form-group">
@@ -38,20 +771,17 @@
                 <input type="text" id="name" formControlName="name" placeholder="John Doe" maxlength="60" autocomplete="name" [class.invalid]="isFieldInvalid('name')">
                 <div *ngIf="isFieldInvalid('name')" class="error-msg">Name is required (min 3 chars).</div>
               </div>
-
               <div class="form-group">
                 <label for="email">Email Address</label>
                 <input type="email" id="email" formControlName="email" placeholder="john@example.com" maxlength="254" autocomplete="email" [class.invalid]="isFieldInvalid('email')">
                 <div *ngIf="isFieldInvalid('email')" class="error-msg">A valid email is required.</div>
               </div>
             </div>
-
             <div class="form-group">
               <label for="phone">Phone Number (Optional)</label>
               <input type="tel" id="phone" formControlName="phone" placeholder="8135550123" maxlength="10" inputmode="numeric" autocomplete="tel" [class.invalid]="isFieldInvalid('phone')">
               <div *ngIf="isFieldInvalid('phone')" class="error-msg">Phone number must be exactly 10 digits (US format, no +1).</div>
             </div>
-
             <div class="form-group">
               <label for="address">Full Address</label>
               <div class="address-input-wrapper">
@@ -61,12 +791,10 @@
                 </button>
               </div>
               <div *ngIf="isFieldInvalid('address')" class="error-msg">Valid address is required (min 10 chars).</div>
-              
-              <!-- Coverage Status Message -->
-              <div class="coverage-status" *ngIf="coverageMessage || isCheckingCoverage" [class.success]="coverageStatus !== 'outside'" [class.warning]="coverageStatus === 'borderline'" [class.error]="coverageStatus === 'outside' && !isCheckingCoverage" [class.loading]="isCheckingCoverage">
+              <div class="coverage-status" *ngIf="coverageMessage || isCheckingCoverage" [class.success]="hasVerifiedCoverage && coverageStatus !== 'outside'" [class.warning]="hasVerifiedCoverage && coverageStatus === 'borderline'" [class.error]="(!hasVerifiedCoverage && !!coverageMessage && !isCheckingCoverage) || (hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage)" [class.loading]="isCheckingCoverage">
                 <span class="status-icon">
                   <ng-container *ngIf="!isCheckingCoverage">
-                    {{ coverageStatus === 'outside' ? '❌' : (coverageStatus === 'borderline' ? '⚠️' : '✅') }}
+                    {{ hasVerifiedCoverage ? (coverageStatus === 'outside' ? '❌' : (coverageStatus === 'borderline' ? '⚠️' : '✅')) : 'ℹ️' }}
                   </ng-container>
                   <i *ngIf="isCheckingCoverage" class="fas fa-spinner fa-spin"></i>
                 </span>
@@ -78,27 +806,29 @@
             </div>
 
             <h2 class="section-title">Schedule Your Cleaning</h2>
-            <div class="service-selection-container">
-              <div class="form-group rich-select-group">
-                <label for="cleaningType" class="main-label">What service do you need? <span>*</span></label>
-                <div class="select-wrapper">
-                  <select id="cleaningType" 
-                          formControlName="cleaningType" 
-                          [class.invalid]="isFieldInvalid('cleaningType')"
-                          class="rich-select">
-                    <option value="" disabled selected>Select a professional cleaning service...</option>
-                    <option *ngFor="let service of availableServices; trackBy: trackByServiceSlug" [value]="service.slug">
-                      {{ service.title }}
-                    </option>
-                  </select>
-                  <div class="select-arrow"></div>
+            <ng-container *ngIf="!useV2Model">
+              <div class="service-selection-container">
+                <div class="form-group rich-select-group">
+                  <label for="cleaningType" class="main-label">What service do you need? <span>*</span></label>
+                  <div class="select-wrapper">
+                    <select id="cleaningType"
+                            formControlName="cleaningType"
+                            [class.invalid]="isFieldInvalid('cleaningType')"
+                            class="rich-select">
+                      <option value="" disabled selected>Select a professional cleaning service...</option>
+                      <option *ngFor="let service of availableServices; trackBy: trackByServiceSlug" [value]="service.slug">
+                        {{ service.title }}
+                      </option>
+                    </select>
+                    <div class="select-arrow"></div>
+                  </div>
+                  <div *ngIf="isFieldInvalid('cleaningType')" class="error-msg">Please select a cleaning service to continue.</div>
                 </div>
-                <div *ngIf="isFieldInvalid('cleaningType')" class="error-msg">Please select a cleaning service to continue.</div>
               </div>
-            </div>
-            <div class="selected-service-name" *ngIf="selectedService?.title">
-              <small><strong>Selected:</strong> {{ selectedService?.title }}</small>
-            </div>
+              <div class="selected-service-name" *ngIf="selectedService?.title">
+                <small><strong>Selected:</strong> {{ selectedService?.title }}</small>
+              </div>
+            </ng-container>
 
             <div class="form-row mt-4">
               <div class="form-group">
@@ -115,7 +845,6 @@
                 <div *ngIf="isFieldInvalid('desiredDate') && (bookingForm.get('desiredDate')?.errors?.['pastDate'] || bookingForm.get('desiredDate')?.errors?.['invalidDateFormat'])" class="error-msg">Select a valid future date.</div>
                 <div *ngIf="isFieldInvalid('desiredDate') && bookingForm.get('desiredDate')?.errors?.['dateTooFar']" class="error-msg">Please select a date within the next year.</div>
               </div>
-
               <div class="form-group">
                 <label for="desiredTime">Desired Time</label>
                 <select id="desiredTime" formControlName="desiredTime" [class.invalid]="isFieldInvalid('desiredTime')">
@@ -130,33 +859,43 @@
 
             <div class="dynamic-fields-section service-notes-section">
               <h3 class="section-subtitle">Service Notes / Special Conditions</h3>
-
               <div class="checkbox-wrapper">
                 <label class="checkbox-label">
                   <input type="checkbox" formControlName="petsAtHome">
-                  Pets at home (please take precautions)
+                  {{ v2ServiceNotesLabels.petsAtHome }}
                 </label>
-                <small class="helper-text" *ngIf="petsAtHomeControl?.value">We may contact you for additional details about your pet.</small>
+                <small class="helper-text">{{ v2ServiceNotesLabels.petsAtHomeHelper }}</small>
+                <div *ngIf="petsAtHomeControl?.value" class="form-group" style="margin-top:.75rem;">
+                  <label style="font-weight:600;">{{ v2ServiceNotesLabels.petsQuestion }}</label>
+                  <p class="helper-text" style="margin-top:.25rem;">{{ v2ServiceNotesLabels.petsQuestionHelper }}</p>
+                  <textarea rows="3" formControlName="petSafetyNotes" [placeholder]="v2ServiceNotesLabels.petsPlaceholder" style="width:100%;padding:.65rem;border-radius:8px;"></textarea>
+                  <div style="margin-top:.85rem;padding:.75rem 1rem;border-radius:10px;background:linear-gradient(135deg,#fff9c4 0%,#fff59d 100%);border:1px solid #fbc02d;">
+                    <strong style="color:#795548;display:block;margin-bottom:.25rem;">⚠️ {{ v2ServiceNotesLabels.petsSafetyTitle }}</strong>
+                    <p style="margin:0;color:#4e342e;font-size:.84rem;line-height:1.45;">{{ v2ServiceNotesLabels.petsSafetyText }}</p>
+                  </div>
+                </div>
               </div>
-
-              <div class="checkbox-wrapper">
+              <div class="checkbox-wrapper" style="margin-top:1rem;">
                 <label class="checkbox-label">
                   <input type="checkbox" formControlName="useOwnProducts">
-                  I prefer the team to use my own cleaning products
+                  {{ v2ServiceNotesLabels.useOwnProducts }}
                 </label>
-                <small class="helper-text" *ngIf="useOwnProductsControl?.value">We are not responsible for results when using client-provided products.</small>
+                <small class="helper-text">{{ v2ServiceNotesLabels.useOwnProductsHelper }}</small>
+                <div *ngIf="useOwnProductsControl?.value" class="form-group" style="margin-top:.75rem;">
+                  <label style="font-weight:600;">{{ v2ServiceNotesLabels.productsQuestion }}</label>
+                  <p class="helper-text" style="margin-top:.25rem;">{{ v2ServiceNotesLabels.productsQuestionHelper }}</p>
+                  <textarea rows="4" formControlName="cleaningProductNotes" [placeholder]="v2ServiceNotesLabels.productsPlaceholder" style="width:100%;padding:.65rem;border-radius:8px;"></textarea>
+                </div>
               </div>
             </div>
 
-            <!-- Business Rule Alert in Form -->
             <div class="business-rule-form-alert" *ngIf="selectedService?.businessRule">
               <span class="rule-icon">⚠️</span>
               <p>{{ selectedService?.businessRule }}</p>
             </div>
 
-            <!-- Wrap existing dynamic and shared fields in a container that checks coverage -->
-            <div class="booking-details-wrapper" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
-              <div class="coverage-blocker" *ngIf="coverageStatus === 'outside' && !isCheckingCoverage && bookingForm.get('address')?.value?.length >= 10">
+            <div class="booking-details-wrapper" [class.disabled-overlay]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+              <div class="coverage-blocker" *ngIf="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage && bookingForm.get('address')?.value?.length >= 10">
                 <div class="blocker-content">
                   <i class="fas fa-map-location-dot"></i>
                   <h3>Service Unavailable</h3>
@@ -164,31 +903,29 @@
                 </div>
               </div>
 
+              <ng-container *ngIf="!useV2Model">
             <!-- Dynamic Fields Section - Standard Cleaning Only -->
             <div *ngIf="selectedService?.slug === 'standard-cleaning'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Standard Cleaning — Select Your Home Size</h3>
-
               <div class="form-group">
                 <label for="stdPackage">Bedrooms / Bathrooms</label>
                 <div class="select-wrapper">
                   <select id="stdPackage" class="rich-select" formControlName="stdPackage">
                     <option *ngFor="let pkg of standardPackages" [value]="pkg.id">
-                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
+                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath
                     </option>
                   </select>
                   <div class="select-arrow"></div>
                 </div>
               </div>
-
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
-                  <label for="extraBedrooms">Additional bedrooms: +$30 per bedroom</label>
+                  <label for="extraBedrooms">Additional bedrooms</label>
                   <input type="number" id="extraBedrooms" formControlName="extraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('extraBedrooms')">
                   <div *ngIf="isFieldInvalid('extraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
             </div>
-
             <!-- Dynamic Fields Section - Apartment Cleaning -->
             <div *ngIf="selectedService?.slug === 'apartment-cleaning'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Apartment Cleaning — Select Your Home Size</h3>
@@ -197,7 +934,7 @@
                 <div class="select-wrapper">
                   <select id="aptPackage" class="rich-select" formControlName="aptPackage">
                     <option *ngFor="let pkg of apartmentPackages" [value]="pkg.id">
-                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
+                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath
                     </option>
                   </select>
                   <div class="select-arrow"></div>
@@ -205,13 +942,12 @@
               </div>
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
-                  <label for="aptExtraBedrooms">Additional bedrooms: +$20 per bedroom</label>
+                  <label for="aptExtraBedrooms">Additional bedrooms</label>
                   <input type="number" id="aptExtraBedrooms" formControlName="aptExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('aptExtraBedrooms')">
                   <div *ngIf="isFieldInvalid('aptExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
             </div>
-
             <!-- Dynamic Fields Section - Deep Cleaning -->
             <div *ngIf="selectedService?.slug === 'deep-cleaning'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Deep Cleaning — Select Your Home Size</h3>
@@ -220,7 +956,7 @@
                 <div class="select-wrapper">
                   <select id="deepPackage" class="rich-select" formControlName="deepPackage">
                     <option *ngFor="let pkg of deepPackages" [value]="pkg.id">
-                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
+                      {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath
                     </option>
                   </select>
                   <div class="select-arrow"></div>
@@ -228,13 +964,12 @@
               </div>
               <div class="form-grid" style="margin-top: 1rem;">
                 <div class="form-group full-width">
-                  <label for="deepExtraBedrooms">Additional bedrooms: +$40 per bedroom</label>
+                  <label for="deepExtraBedrooms">Additional bedrooms</label>
                   <input type="number" id="deepExtraBedrooms" formControlName="deepExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('deepExtraBedrooms')">
                   <div *ngIf="isFieldInvalid('deepExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                 </div>
               </div>
             </div>
-
             <!-- Dynamic Fields Section - Move-In / Move-Out -->
             <div *ngIf="selectedService?.slug === 'move-in-move-out'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Move-In / Move-Out — Choose Mode and Size</h3>
@@ -243,46 +978,43 @@
                 <label class="radio-label"><input type="radio" formControlName="moveMode" value="move_in"> Move-In</label>
                 <label class="radio-label"><input type="radio" formControlName="moveMode" value="both"> Both</label>
               </div>
-
               <div class="form-grid" style="margin-top: 1rem;" *ngIf="bookingForm.get('dynamicFields.moveMode')?.value === 'move_out' || bookingForm.get('dynamicFields.moveMode')?.value === 'both'">
                 <div class="form-group full-width">
                   <label for="moPackage">Move-Out: Bedrooms / Bathrooms</label>
                   <div class="select-wrapper">
                     <select id="moPackage" class="rich-select" formControlName="moPackage">
                       <option *ngFor="let pkg of moveOutPackages" [value]="pkg.id">
-                        {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
+                        {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath
                       </option>
                     </select>
                     <div class="select-arrow"></div>
                   </div>
                   <div class="form-group" style="margin-top: 1rem;">
-                    <label for="moveOutExtraBedrooms">Move-Out: Additional bedrooms: +$40 per bedroom</label>
+                    <label for="moveOutExtraBedrooms">Move-Out: Additional bedrooms</label>
                     <input type="number" id="moveOutExtraBedrooms" formControlName="moveOutExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveOutExtraBedrooms')">
                     <div *ngIf="isFieldInvalid('moveOutExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                   </div>
                 </div>
               </div>
-
               <div class="form-grid" style="margin-top: 1rem;" *ngIf="bookingForm.get('dynamicFields.moveMode')?.value === 'move_in' || bookingForm.get('dynamicFields.moveMode')?.value === 'both'">
                 <div class="form-group full-width">
                   <label for="miPackage">Move-In: Bedrooms / Bathrooms</label>
                   <div class="select-wrapper">
                     <select id="miPackage" class="rich-select" formControlName="miPackage">
                       <option *ngFor="let pkg of moveInPackages" [value]="pkg.id">
-                        {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath → ${{ pkg.price }}
+                        {{ pkg.bedrooms }} bed / {{ pkg.bathrooms }} bath
                       </option>
                     </select>
                     <div class="select-arrow"></div>
                   </div>
                   <div class="form-group" style="margin-top: 1rem;">
-                    <label for="moveInExtraBedrooms">Move-In: Additional bedrooms: +$30 per bedroom</label>
+                    <label for="moveInExtraBedrooms">Move-In: Additional bedrooms</label>
                     <input type="number" id="moveInExtraBedrooms" formControlName="moveInExtraBedrooms" min="0" max="10" [class.invalid]="isFieldInvalid('moveInExtraBedrooms')">
                     <div *ngIf="isFieldInvalid('moveInExtraBedrooms')" class="error-msg">Enter a value between 0 and 10.</div>
                   </div>
                 </div>
               </div>
             </div>
-
             <!-- Dynamic Fields Section - Post-Construction -->
             <div *ngIf="selectedService?.slug === 'post-construction-cleaning'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Post-Construction — Enter Work Details</h3>
@@ -299,7 +1031,6 @@
                 </div>
               </div>
             </div>
-
             <!-- Dynamic Fields Section - Window Cleaning -->
             <div *ngIf="selectedService?.slug === 'window-cleaning'" formGroupName="dynamicFields" class="dynamic-fields-section">
               <h3 class="section-subtitle">Window Cleaning — Enter Quantity</h3>
@@ -309,175 +1040,327 @@
                 <div *ngIf="isFieldInvalid('units')" class="error-msg">Enter a valid count.</div>
               </div>
             </div>
-
+              </ng-container>
             </div>
           </div>
 
           <div class="booking-form-grid__service">
-      
-
-      <!-- Extras Section (applies to all services) -->
-      <div class="dynamic-fields-section booking-details-wrapper" *ngIf="selectedService" formGroupName="dynamicFields" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
-        <h3 class="section-subtitle">Add Extras</h3>
-        <div class="extras-grid">
-          <ng-container *ngFor="let extra of extrasCatalog; trackBy: trackByExtraId">
-            <div class="checkbox-label" style="align-items: center;" *ngIf="extra.id === 'windows_exterior' || extra.id === 'laundry'; else simpleExtra">
-              <label style="display:flex;align-items:center;gap:.5rem;">
-                <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
-                {{ extra.label }} ({{ extra.id === 'windows_exterior' ? '+$8 per window' : '+$15 per load' }})
-              </label>
-              <ng-container *ngIf="extra.id === 'windows_exterior' && isExtraSelected('windows_exterior')">
-                <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty">
-                <small style="margin-left:0.75rem;">Number of windows: {{ windowsQuantitySelected }} selected</small>
-              </ng-container>
-              <ng-container *ngIf="extra.id === 'laundry' && isExtraSelected('laundry')">
-                <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)">
-                <small style="margin-left:0.75rem;">Number of loads: {{ laundryLoadsSelected }} selected</small>
-              </ng-container>
+            <!-- [LEGACY V1] Extras Section -->
+            <div class="dynamic-fields-section booking-details-wrapper" *ngIf="selectedService" formGroupName="dynamicFields" [class.disabled-overlay]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+              <h3 class="section-subtitle">Add Extras</h3>
+              <div class="extras-grid">
+                <ng-container *ngFor="let extra of extrasCatalog; trackBy: trackByExtraId">
+                  <div class="checkbox-label" style="align-items: center;" *ngIf="extra.id === 'windows_exterior' || extra.id === 'laundry'; else simpleExtra">
+                    <label style="display:flex;align-items:center;gap:.5rem;">
+                      <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+                      {{ extra.label }}
+                    </label>
+                    <ng-container *ngIf="extra.id === 'windows_exterior' && isExtraSelected('windows_exterior')">
+                      <input type="number" formControlName="windowsQuantity" min="1" max="5000" style="width:100px;margin-left:0.75rem;" placeholder="Qty">
+                      <small style="margin-left:0.75rem;">Number of windows: {{ windowsQuantitySelected }} selected</small>
+                    </ng-container>
+                    <ng-container *ngIf="extra.id === 'laundry' && isExtraSelected('laundry')">
+                      <input type="number" formControlName="laundryLoads" min="1" max="2" style="width:100px;margin-left:0.75rem;" placeholder="Loads (max 2)">
+                      <small style="margin-left:0.75rem;">Number of loads: {{ laundryLoadsSelected }} selected</small>
+                    </ng-container>
+                  </div>
+                  <ng-template #simpleExtra>
+                    <label class="checkbox-label">
+                      <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+                      {{ extra.label }}
+                    </label>
+                  </ng-template>
+                </ng-container>
+              </div>
+            </div>
+            <!-- Pricing Summary Legacy -->
+            <div class="pricing-summary booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+              <div class="checkbox-group">
+                <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
+                  <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This address already used the first-time discount' : null">
+                    <input type="checkbox" formControlName="applyFirstDiscount">
+                    <div style="flex:1 1 auto;">
+                      <div style="font-weight:600;">{{ v2ServiceNotesLabels.firstTimeDiscountLabel }}</div>
+                      <div style="margin-top:.2rem;color:var(--text-muted);font-size:.85rem;line-height:1.4;">
+                        {{ v2ServiceNotesLabels.firstTimeDiscountHelper }}
+                      </div>
+                      <div style="margin-top:.35rem;color:#2e7d32;font-weight:500;font-size:.82rem;">
+                        ℹ️ {{ v2ServiceNotesLabels.firstTimeDiscountInfoText }}
+                      </div>
+                    </div>
+                  </label>
+                  <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This address already used the first-time discount'">i</span>
+                </div>
+                <div class="price-note" *ngIf="isCheckingDiscount">Checking discount eligibility…</div>
+                <div class="price-note" *ngIf="discountCheckMessage">{{ discountCheckMessage }}</div>
+                <div class="price-note">Discount review is performed by the team per household/address.</div>
+              </div>
+              <div class="pricing-summary__actions">
+                <app-button
+                  type="button"
+                  variant="outline"
+                  size="small"
+                  (btnClick)="requestCoverageEstimate()"
+                  [disabled]="!canRequestCoverageEstimate"
+                >Check Coverage & Estimate</app-button>
+              </div>
+              <div class="price-box">
+                <span class="price-label">Estimated Price:</span>
+                <span class="price-value">
+                  {{ hasPricePreviewData ? (estimatedPrice | currency:'USD':'symbol':'1.0-2') : 'Pending' }}
+                </span>
+              </div>
+              <div class="price-box" *ngIf="!isPublicQuoteRequestMode">
+                <span class="price-label">Final Price:</span>
+                <span class="price-value">
+                  {{ hasPricePreviewData ? (finalPrice | currency:'USD':'symbol':'1.0-2') : 'Pending' }}
+                </span>
+              </div>
+              <div class="price-breakdown" *ngIf="hasPricePreviewData && pricingItems?.length">
+                <div class="price-breakdown__row" *ngFor="let item of pricingItems">
+                  <span class="price-breakdown__label">{{ item.label }}</span>
+                  <span class="price-breakdown__amount">{{ item.amount | currency:'USD':'symbol':'1.0-2' }}</span>
+                </div>
+              </div>
+              <p class="price-note">
+                {{
+                  isPublicQuoteRequestMode
+                    ? '*This estimate is optional and only updates when you click "Check Coverage & Estimate".'
+                    : '*Estimate updates only when you click "Check Coverage & Estimate". Final price may vary based on on-site inspection.'
+                }}
+              </p>
             </div>
 
-            <ng-template #simpleExtra>
-              <label class="checkbox-label">
-                <input type="checkbox" (change)="onExtraChange($event)" [value]="extra.id" [checked]="isExtraSelected(extra.id)" [disabled]="coverageStatus === 'outside' && !isCheckingCoverage">
-                {{ extra.label }} (+${{ extra.fixedPrice }})
-              </label>
-            </ng-template>
-          </ng-container>
-        </div>
-      </div>
-
-      <!-- Pricing Summary -->
-      <div class="pricing-summary booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
-        <div class="checkbox-group">
-          <div class="discount-option" [class.discount-option--blocked]="isDiscountBlocked">
-          <label class="checkbox-label" [attr.title]="isDiscountBlocked ? 'This address already used the 15% discount' : null">
-            <input type="checkbox" formControlName="applyFirstDiscount">
-            Apply 15% first-service discount
-          </label>
-          <span class="discount-option__info" *ngIf="isDiscountBlocked" [attr.data-tooltip]="discountCheckMessage || 'This address already used the 15% discount'">i</span>
+            <div class="form-actions booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="hasVerifiedCoverage && coverageStatus === 'outside' && !isCheckingCoverage">
+              <app-button type="submit" size="large" [loading]="isSubmitting" [disabled]="bookingForm.invalid || isCheckingCoverage || isSubmitting">
+                {{ isPublicQuoteRequestMode ? 'Request Quote' : 'Complete Booking' }}
+              </app-button>
+            </div>
           </div>
-          <div class="price-note" *ngIf="isCheckingDiscount">Checking discount availability...</div>
-          <div class="price-note" *ngIf="discountCheckMessage">{{ discountCheckMessage }}</div>
-          <div class="price-note">Discount applies per household/address.</div>
         </div>
-        <div class="price-box">
-          <span class="price-label">Estimated Price:</span>
-          <span class="price-value" *ngIf="estimatedPrice !== 'custom'">
-            ${{ estimatedPrice }}
-          </span>
-          <span class="price-custom" *ngIf="estimatedPrice === 'custom'">
-            Custom Quote Required
-          </span>
-        </div>
-        <div class="price-box" *ngIf="estimatedPrice !== 'custom'">
-          <span class="price-label">Final Price:</span>
-          <span class="price-value">${{ finalPrice }}</span>
-        </div>
-        <p class="price-note" *ngIf="estimatedPrice !== 'custom'">
-          *Final price may vary based on actual on-site inspection.
-        </p>
-        <p class="price-note" *ngIf="estimatedPrice === 'custom'">
-          Our team will contact you within 24 hours with a personalized quote.
-        </p>
+        <!-- /[LEGACY V1] 2-column layout -->
 
-        <!-- Placeholder messages -->
-        <div class="price-note" *ngIf="borderlineFee > 0">
-          ⚠️ Great news! We cover {{ coverageCity }} ({{ assignedDistance }}km from center). Note: A $20 distance surcharge applies to this borderline area.
-        </div>
-      </div>
-
-      <div class="form-actions booking-details-wrapper" *ngIf="selectedService" [class.disabled-overlay]="coverageStatus === 'outside' && !isCheckingCoverage">
-        <app-button type="submit" size="large" [loading]="isSubmitting" [disabled]="bookingForm.invalid || coverageStatus === 'outside'">
-          Complete Booking
-        </app-button>
-      </div>
-
-      <div class="confirm-modal" *ngIf="isConfirmModalOpen" (click)="closeConfirmModal()">
-        <div class="confirm-modal__content" (click)="$event.stopPropagation()">
-          <div class="confirm-modal__header">
-            <h2>Confirm Your Booking</h2>
-            <button type="button" class="confirm-modal__close" (click)="closeConfirmModal()" aria-label="Close modal">×</button>
-          </div>
-
-          <div class="confirm-modal__body" *ngIf="confirmSnapshot">
-            <div class="confirm-section">
-              <h3>Contact</h3>
-              <div class="confirm-list">
-                <div class="confirm-item"><span class="confirm-key">Full Name</span><span class="confirm-val">{{ confirmSnapshot.name }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Email Address</span><span class="confirm-val">{{ confirmSnapshot.email }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Phone Number</span><span class="confirm-val">{{ confirmSnapshot.phone }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Full Address</span><span class="confirm-val">{{ confirmSnapshot.address }}</span></div>
-              </div>
+        <!-- ============================================================
+             MODALES (Compartidos V1/V2)
+             ============================================================ -->
+        <div class="confirm-modal" *ngIf="isConfirmModalOpen" (click)="closeConfirmModal()" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+          <div class="confirm-modal__content" (click)="$event.stopPropagation()">
+            <div class="confirm-modal__header">
+              <h2 id="confirmModalTitle">{{ isPublicQuoteRequestMode ? 'Confirm Your Quote Request' : 'Confirm Your Booking' }}</h2>
+              <button type="button" class="confirm-modal__close" (click)="closeConfirmModal()" aria-label="Close confirmation modal">×</button>
             </div>
 
-            <div class="confirm-section">
-              <h3>Appointment</h3>
-              <div class="confirm-list">
-                <div class="confirm-item"><span class="confirm-key">Selected Service</span><span class="confirm-val">{{ confirmSnapshot.serviceTitle }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Desired Date</span><span class="confirm-val">{{ confirmSnapshot.desiredDate }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Desired Time</span><span class="confirm-val">{{ confirmSnapshot.desiredTime }}</span></div>
+            <div class="confirm-modal__body" *ngIf="confirmSnapshot">
+              <div class="confirm-section">
+                <h3>Contact</h3>
+                <div class="confirm-list">
+                  <div class="confirm-item"><span class="confirm-key">Full Name</span><span class="confirm-val">{{ confirmSnapshot.name }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Email Address</span><span class="confirm-val">{{ confirmSnapshot.email }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Phone Number</span><span class="confirm-val">{{ confirmSnapshot.phone }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Full Address</span><span class="confirm-val">{{ confirmSnapshot.address }}</span></div>
+                </div>
               </div>
-            </div>
 
-            <div class="confirm-section">
-              <h3>Service Notes</h3>
-              <div class="confirm-list">
-                <div class="confirm-item"><span class="confirm-key">Pets at home</span><span class="confirm-val">{{ confirmSnapshot.petsAtHome ? 'Yes' : 'No' }}</span></div>
-                <div class="confirm-item"><span class="confirm-key">Use own products</span><span class="confirm-val">{{ confirmSnapshot.useOwnProducts ? 'Yes' : 'No' }}</span></div>
+              <div class="confirm-section">
+                <h3>Appointment</h3>
+                <div class="confirm-list">
+                  <div class="confirm-item"><span class="confirm-key">Selected Service</span><span class="confirm-val">{{ confirmSnapshot.serviceTitle }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Desired Date</span><span class="confirm-val">{{ confirmSnapshot.desiredDate }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Desired Time</span><span class="confirm-val">{{ confirmSnapshot.desiredTime }}</span></div>
+                </div>
               </div>
-            </div>
 
-            <div class="confirm-section" *ngIf="confirmSnapshot.details?.length">
-              <h3>Service Details</h3>
-              <div class="confirm-list">
-                <div class="confirm-item" *ngFor="let d of confirmSnapshot.details">
-                  <span class="confirm-key">{{ d.label }}</span>
-                  <span class="confirm-val">{{ d.value }}</span>
+              <div class="confirm-section">
+                <h3>Service Notes</h3>
+                <div class="confirm-list">
+                  <div class="confirm-item"><span class="confirm-key">{{ v2ServiceNotesLabels.firstTimeDiscountRequestLabel || 'First-Service Discount Request' }}</span><span class="confirm-val">{{ confirmSnapshot.firstServiceDiscountRequested ? 'Yes' : 'No' }}</span></div>
+                  <div class="confirm-item"><span class="confirm-key">Pets at home</span><span class="confirm-val">{{ confirmSnapshot.petsAtHome ? 'Yes' : 'No' }}</span></div>
+                  <div class="confirm-item" *ngIf="confirmSnapshot.petsAtHome && confirmSnapshot.petSafetyNotes">
+                    <span class="confirm-key">{{ v2ServiceNotesLabels.petSafetyNotesLabel }}</span>
+                    <span class="confirm-val confirm-val--multiline">{{ confirmSnapshot.petSafetyNotes }}</span>
+                  </div>
+                  <div class="confirm-item"><span class="confirm-key">{{ v2ServiceNotesLabels.ownProductsLabel }}</span><span class="confirm-val">{{ confirmSnapshot.useOwnProducts ? 'Yes' : 'No' }}</span></div>
+                  <div class="confirm-item" *ngIf="confirmSnapshot.useOwnProducts && confirmSnapshot.cleaningProductNotes">
+                    <span class="confirm-key">{{ v2ServiceNotesLabels.productInstructionsLabel }}</span>
+                    <span class="confirm-val confirm-val--multiline">{{ confirmSnapshot.cleaningProductNotes }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="confirm-section" *ngIf="confirmSnapshot.details?.length">
+                <h3>Service Details</h3>
+                <div class="confirm-list">
+                  <div class="confirm-item" *ngFor="let d of confirmSnapshot.details">
+                    <span class="confirm-key">{{ d.label }}</span>
+                    <span class="confirm-val">{{ d.value }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="confirm-section">
+                <h3>Add-Ons</h3>
+                <div *ngIf="confirmSnapshot.extras?.length; else noExtras" class="confirm-tags">
+                  <span class="confirm-tag" *ngFor="let x of confirmSnapshot.extras">{{ x }}</span>
+                </div>
+                <ng-template #noExtras>
+                  <p class="confirm-muted">No add-ons selected.</p>
+                </ng-template>
+              </div>
+
+              <div class="confirm-section">
+                <h3>Pricing</h3>
+                <div class="confirm-list">
+                  <div class="confirm-item" *ngIf="isPublicQuoteRequestMode">
+                    <span class="confirm-key">Estimated Price</span>
+                    <span class="confirm-val">${{ confirmSnapshot.estimatedPrice }}</span>
+                  </div>
+                  <div class="confirm-item">
+                    <span class="confirm-key">{{ v2ServiceNotesLabels.firstTimeDiscountRequestLabel }}</span>
+                    <span class="confirm-val" [style.color]="confirmSnapshot.firstServiceDiscountRequested ? '#2e7d32' : ''">
+                      {{ confirmSnapshot.firstServiceDiscountRequested ? 'Yes — team will review eligibility' : 'No' }}
+                    </span>
+                  </div>
+                  <div class="confirm-item" *ngIf="confirmSnapshot.discountApplied">
+                    <span class="confirm-key">{{ v2ServiceNotesLabels.discountAppliedByAdminLabel }}</span>
+                    <span class="confirm-val" style="color:#2e7d32;">
+                      Yes ({{ confirmSnapshot.discountPercent }}%) — -${{ confirmSnapshot.discountAmount }}
+                    </span>
+                  </div>
+                  <div class="confirm-item">
+                    <span class="confirm-key">Borderline Surcharge (≤1km)</span>
+                    <span class="confirm-val">
+                      {{ confirmSnapshot.distanceSurchargeApplied || confirmSnapshot.borderlineFee > 0 ? ('Yes (+$' + (confirmSnapshot.borderlineFee > 0 ? confirmSnapshot.borderlineFee : confirmSnapshot.distanceFee) + ')') : 'No' }}
+                    </span>
+                  </div>
+                  <div class="confirm-item" *ngIf="!isPublicQuoteRequestMode">
+                    <span class="confirm-key">Final Price</span>
+                    <span class="confirm-val">${{ confirmSnapshot.finalPrice }}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="confirm-section">
-              <h3>Add-Ons</h3>
-              <div *ngIf="confirmSnapshot.extras?.length; else noExtras" class="confirm-tags">
-                <span class="confirm-tag" *ngFor="let x of confirmSnapshot.extras">{{ x }}</span>
-              </div>
-              <ng-template #noExtras>
-                <p class="confirm-muted">No add-ons selected.</p>
-              </ng-template>
-            </div>
-
-            <div class="confirm-section">
-              <h3>Pricing</h3>
-              <div class="confirm-list">
-                <div class="confirm-item">
-                  <span class="confirm-key">Discount Applied</span>
-                  <span class="confirm-val">
-                    {{ confirmSnapshot.discountApplied ? ('Yes (15%) - $' + confirmSnapshot.discountAmount) : 'No' }}
-                  </span>
-                </div>
-                <div class="confirm-item">
-                  <span class="confirm-key">Borderline</span>
-                  <span class="confirm-val">
-                    {{ confirmSnapshot.borderlineApplied ? ('Yes (+$' + confirmSnapshot.borderlineFee + ')') : 'No' }}
-                  </span>
-                </div>
-                <div class="confirm-item">
-                  <span class="confirm-key">Final Price</span>
-                  <span class="confirm-val">${{ confirmSnapshot.finalPrice }}</span>
-                </div>
-              </div>
+            <div class="confirm-modal__actions">
+              <app-button type="button" variant="outline" size="large" (btnClick)="closeConfirmModal()" [disabled]="isSubmitting">Cancel</app-button>
+              <app-button type="button" variant="accent" size="large" (btnClick)="confirmAndSubmit()" [loading]="isSubmitting" [disabled]="isSubmitting">
+                {{ isPublicQuoteRequestMode ? 'Confirm and Request Quote' : 'Confirm and Submit' }}
+              </app-button>
             </div>
           </div>
+        </div>
 
-          <div class="confirm-modal__actions">
-            <app-button type="button" variant="outline" size="large" (btnClick)="closeConfirmModal()" [disabled]="isSubmitting">Cancel</app-button>
-            <app-button type="button" variant="accent" size="large" (btnClick)="confirmAndSubmit()" [loading]="isSubmitting" [disabled]="isSubmitting">Confirm and Submit</app-button>
+        <!-- [V2] Modal ⓘ Extra Information -->
+        <div
+          class="confirm-modal"
+          *ngIf="isExtraInfoModalOpen && getExtraInfoModalData() as eData"
+          (click)="closeExtraInfoModal()"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="'einfo-title-' + eData.id"
+        >
+          <div class="confirm-modal__content" style="max-width:760px;" (click)="$event.stopPropagation()">
+            <div class="confirm-modal__header">
+              <h2 [id]="'einfo-title-' + eData.id" style="display:none;">{{ eData.label }}</h2>
+              <button type="button" class="confirm-modal__close" (click)="closeExtraInfoModal()" aria-label="Close extra info modal">×</button>
+            </div>
+            <div class="confirm-modal__body" style="max-height:80vh;overflow-y:auto;padding:0 0 .25rem;">
+              <div class="v2-sinfo__header">
+                <h2>{{ eData.label }}</h2>
+                <span class="v2-sinfo__header-price">{{ eData.modal.priceLabel }}</span>
+              </div>
+
+              <p class="v2-sinfo__description">{{ eData.modal.description }}</p>
+
+              <div class="v2-sinfo__grid">
+                <div class="v2-sinfo__block is-includes">
+                  <h3>✓ Includes</h3>
+                  <ul>
+                    <li *ngFor="let item of eData.modal.includes; trackBy: trackByV2SinfoInclude">{{ item }}</li>
+                  </ul>
+                </div>
+                <div class="v2-sinfo__block is-notincludes">
+                  <h3>✕ Does Not Include</h3>
+                  <ul>
+                    <li *ngFor="let item of eData.modal.doesNotInclude; trackBy: trackByV2SinfoDontInclude">{{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="v2-sinfo__protection">
+                <div class="v2-sinfo__protection-icon" aria-hidden="true">$</div>
+                <div>
+                  <strong>Price</strong><br>
+                  {{ eData.modal.priceLabel }}
+                </div>
+              </div>
+
+              <div class="v2-sinfo__protection">
+                <div class="v2-sinfo__protection-icon" aria-hidden="true">ℹ</div>
+                <div>
+                  <strong>Terms &amp; Conditions</strong><br>
+                  {{ eData.modal.termsAndConditions }}
+                </div>
+              </div>
+            </div>
+            <div class="confirm-modal__actions">
+              <app-button type="button" variant="accent" size="large" (btnClick)="closeExtraInfoModal()">Got it — Close</app-button>
+            </div>
           </div>
         </div>
-      </div>
+        <!-- /Modal Extra Info ⓘ -->
+
+        <!-- [V2] Modal ⓘ Special Service Information (rediseñado responsive) -->
+        <div
+          class="confirm-modal"
+          *ngIf="isServiceInfoModalOpen && getServiceInfoModalData() as modalData"
+          (click)="closeSpecialServiceInfo()"
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-labelledby]="'sinfo-title-' + modalData.id"
+        >
+          <div class="confirm-modal__content" style="max-width:760px;" (click)="$event.stopPropagation()">
+            <div class="confirm-modal__header">
+              <h2 [id]="'sinfo-title-' + modalData.id" style="display:none;">{{ modalData.label }}</h2>
+              <button type="button" class="confirm-modal__close" (click)="closeSpecialServiceInfo()" aria-label="Close service info modal">×</button>
+            </div>
+            <div class="confirm-modal__body" style="max-height:80vh;overflow-y:auto;padding:0 0 .25rem;">
+              <div class="v2-sinfo__header">
+                <h2>{{ modalData.label }}</h2>
+                <span class="v2-sinfo__header-price">Add-on +${{ modalData.flatFee }}</span>
+              </div>
+
+              <p class="v2-sinfo__description">{{ modalData.description }}</p>
+
+              <div class="v2-sinfo__grid">
+                <div class="v2-sinfo__block is-includes">
+                  <h3>✓ Includes</h3>
+                  <ul>
+                    <li *ngFor="let item of modalData.includes; trackBy: trackByV2SinfoInclude">{{ item }}</li>
+                  </ul>
+                </div>
+                <div class="v2-sinfo__block is-notincludes">
+                  <h3>✕ Does Not Include</h3>
+                  <ul>
+                    <li *ngFor="let item of modalData.doesNotInclude; trackBy: trackByV2SinfoDontInclude">{{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="v2-sinfo__protection" *ngIf="modalData.protectionNote">
+                <div class="v2-sinfo__protection-icon" aria-hidden="true">⚠</div>
+                <div>
+                  <strong>Protection note</strong><br>
+                  {{ modalData.protectionNote }}
+                </div>
+              </div>
+            </div>
+            <div class="confirm-modal__actions">
+              <app-button type="button" variant="accent" size="large" (btnClick)="closeSpecialServiceInfo()">Got it — Close</app-button>
+            </div>
           </div>
         </div>
+        <!-- /Modal ⓘ -->
+
       </div>
     </form>
   </div>
